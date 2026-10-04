@@ -1,98 +1,10 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AccountHero } from '@/components/account-hero';
+import { Brand } from '@/components/brand';
+import { useAuth } from '@/features/auth/auth-context';
+import { colors, radius, shadow, spacing, type } from '@/theme/tokens';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
-
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
-});
+export default function WelcomeScreen(){const {session}=useAuth();return <SafeAreaView style={styles.safe} edges={['top','bottom']}><View style={styles.header}><Brand/><View style={styles.adultBadge}><Text style={styles.adultBadgeText}>DÀNH CHO NGƯỜI LỚN</Text></View></View><View style={styles.body}><AccountHero/><View style={styles.copy}><Text style={styles.eyebrow}>ĐỒNG HÀNH CÙNG TRẺ</Text><Text style={styles.title}>Hiểu tiến trình.{`\n`}Gợi mở <Text style={styles.accent}>đúng lúc.</Text></Text><Text style={styles.subtitle}>Một nơi để phụ huynh và giáo viên theo dõi hành trình tài chính của trẻ — rõ ràng, riêng tư và không tạo áp lực.</Text></View></View><View style={styles.actions}><Pressable accessibilityRole="button" onPress={()=>router.replace(session?'/(tabs)':'/login')} style={({pressed})=>[styles.primary,pressed&&styles.pressed]}><Text style={styles.primaryText}>{session?'Mở bảng theo dõi':'Đăng nhập'}</Text><Text style={styles.arrow}>→</Text></Pressable>{!session&&<Pressable accessibilityRole="button" onPress={()=>router.push('/register')} style={({pressed})=>[styles.secondary,pressed&&styles.pressed]}><Text style={styles.secondaryText}>Tạo tài khoản mới</Text></Pressable>}<Text style={styles.privacy}>FinTeen chỉ hiển thị dữ liệu thuộc gia đình hoặc lớp học của bạn.</Text></View></SafeAreaView>}
+const styles=StyleSheet.create({safe:{flex:1,backgroundColor:colors.canvas,paddingHorizontal:spacing.lg},header:{height:66,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},adultBadge:{paddingHorizontal:9,paddingVertical:6,borderRadius:radius.round,backgroundColor:colors.greenSoft},adultBadgeText:{color:colors.greenDark,fontSize:8,fontWeight:'900',letterSpacing:.6},body:{flex:1,justifyContent:'center'},copy:{marginTop:25},eyebrow:{...type.eyebrow,color:colors.green},title:{...type.hero,color:colors.ink,marginTop:8},accent:{color:colors.purple},subtitle:{...type.body,color:colors.muted,marginTop:12},actions:{paddingTop:18,paddingBottom:8,gap:9},primary:{height:58,borderRadius:radius.lg,backgroundColor:colors.yellow,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:10,...shadow.button},primaryText:{color:colors.ink,fontSize:16,fontWeight:'900'},arrow:{fontSize:23,color:colors.ink},secondary:{height:50,borderRadius:radius.lg,alignItems:'center',justifyContent:'center',backgroundColor:colors.white,borderWidth:1.5,borderColor:colors.line},secondaryText:{color:colors.greenDark,fontSize:14,fontWeight:'900'},pressed:{opacity:.72,transform:[{scale:.99}]},privacy:{color:colors.muted,textAlign:'center',fontSize:9,lineHeight:14,marginTop:3}});

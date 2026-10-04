@@ -1,0 +1,4 @@
+import { StyleSheet, Text, View } from 'react-native';
+import { colors } from '@/theme/tokens';
+export function Brand({ compact = false }: { compact?: boolean }) { return <View style={styles.row}><View style={styles.mark}><Text style={styles.markText}>F</Text></View>{!compact && <Text style={styles.name}>Fin<Text style={styles.teen}>Teen</Text></Text>}</View>; }
+const styles = StyleSheet.create({ row: { flexDirection: 'row', alignItems: 'center', gap: 9 }, mark: { width: 34, height: 34, borderRadius: 12, backgroundColor: colors.green, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-5deg' }] }, markText: { color: colors.white, fontWeight: '900', fontSize: 20 }, name: { color: colors.ink, fontWeight: '900', fontSize: 21, letterSpacing: -0.7 }, teen: { color: colors.green } });
