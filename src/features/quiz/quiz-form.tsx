@@ -11,6 +11,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { createQuestion } from './data';
 import type { QuizDraft, QuizQuestion } from './types';
 import { colors, radius, shadow, spacing, type } from '@/theme/tokens';
@@ -80,7 +82,8 @@ export function QuizForm({ initialValue, onCancel, onSubmit }: QuizFormProps) {
 
         <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.intro}>
-            <View style={styles.introIcon}><Text style={styles.introEmoji}>✦</Text></View>
+            <Image source={require('../../../assets/images/finteen/quiz-create-bg-v3.png')} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="center" />
+            <LinearGradient colors={['rgba(10,43,29,.96)','rgba(10,43,29,.72)','rgba(10,43,29,.1)']} start={{x:0,y:0}} end={{x:1,y:0}} style={StyleSheet.absoluteFill}/>
             <View style={styles.introCopy}>
               <Text style={styles.introTitle}>Tạo một bài kiểm tra thật dễ hiểu</Text>
               <Text style={styles.introText}>Mỗi câu gồm 4 lựa chọn. Chạm vào vòng tròn để đánh dấu đáp án đúng.</Text>
@@ -205,12 +208,12 @@ const styles = StyleSheet.create({
   countBadge: { paddingHorizontal: 10, paddingVertical: 7, backgroundColor: colors.purpleSoft, borderRadius: radius.round },
   countText: { color: colors.purple, fontSize: 11, fontWeight: '900' },
   content: { padding: spacing.lg, paddingBottom: 36, gap: spacing.lg },
-  intro: { flexDirection: 'row', gap: 13, padding: 16, backgroundColor: colors.purpleSoft, borderRadius: radius.lg, borderWidth: 1, borderColor: '#DDD0FA' },
+  intro: { minHeight: 190, justifyContent: 'flex-end', padding: 16, borderRadius: radius.xl, overflow: 'hidden' },
   introIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.purple },
   introEmoji: { color: colors.white, fontSize: 21 },
-  introCopy: { flex: 1 },
-  introTitle: { color: '#42296B', fontSize: 14, fontWeight: '900' },
-  introText: { color: '#695780', fontSize: 11, lineHeight: 17, marginTop: 4 },
+  introCopy: { width: '64%' },
+  introTitle: { color: colors.white, fontSize: 16, fontWeight: '900' },
+  introText: { color: '#E4EFE9', fontSize: 11, lineHeight: 17, marginTop: 4 },
   section: { gap: 9 },
   label: { color: colors.inkSoft, fontSize: 13, fontWeight: '800', marginTop: 3 },
   required: { color: colors.coral },

@@ -1,333 +1,137 @@
-import { router } from "expo-router";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
-import { Screen } from "@/components/screen";
-import { Card, Pill, Progress, SectionTitle } from "@/components/ui";
-import {
-  learnerDirectory,
-  learnerGroups,
-  servicePackages,
-} from "@/data/dashboard";
-import { useAuth } from "@/features/auth/auth-context";
-import { colors, radius, shadow, type } from "@/theme/tokens";
+import { useState } from 'react';
+import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SymbolView } from 'expo-symbols';
+import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { groupsApi, slotsApi, type Slot } from '@/api';
+import { ConfirmDialog, NoticeBanner } from '@/components/feedback';
+import { Screen } from '@/components/screen';
+import { Card, Pill, Progress } from '@/components/ui';
+import { useWorkspaceData } from '@/features/account/use-workspace-data';
+import { useAuth } from '@/features/auth/auth-context';
+import { colors, radius, shadow, spacing, type } from '@/theme/tokens';
+
+type FormState = { type: 'group' | 'slot' | 'bulk' | 'pin'; slot?: Slot } | null;
+type Confirmation = { title: string; description: string; success: string; destructive: boolean; action: () => Promise<unknown> } | null;
+type SlotFilter = 'ACTIVE' | 'INACTIVE' | 'ALL';
+const PAGE_SIZE = 10;
+const teacherBanner = require('../../../assets/images/finteen/journey-teacher-bg-v3.png');
+const parentBanner = require('../../../assets/images/finteen/journey-parent-bg-v3.png');
 
 export default function ManagementScreen() {
-  const { session } = useAuth();
-  const teacher = session?.role === "TEACHER";
-  const pack = servicePackages[teacher ? "TEACHER" : "PARENT"];
+  const { isGuest, session } = useAuth();
+  const { capacity, error: loadError, group, loading, reload, slots } = useWorkspaceData();
+  const teacher = session?.role === 'TEACHER';
+  const active = slots.filter((slot) => slot.status === 'ACTIVE');
+  const limit = Number(group?.slotLimit) || (teacher ? 40 : 4);
+  const available = capacity ?? Math.max(0, limit - active.length);
+  const [form, setForm] = useState<FormState>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [confirmation, setConfirmation] = useState<Confirmation>(null);
+  const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<SlotFilter>('ACTIVE');
+  const [page, setPage] = useState(1);
+  const [showGroupMenu, setShowGroupMenu] = useState(false);
+  const normalizedSearch = search.trim().toLocaleLowerCase('vi');
+  const visibleSlots = [...slots].filter((slot) => {
+    const matchesFilter = filter === 'ALL' || (filter === 'ACTIVE' ? slot.status === 'ACTIVE' : slot.status !== 'ACTIVE');
+    const matchesSearch = !normalizedSearch || `${slot.displayName ?? ''} ${slot.code ?? ''}`.toLocaleLowerCase('vi').includes(normalizedSearch);
+    return matchesFilter && matchesSearch;
+  }).sort((a, b) => (a.displayName ?? '').localeCompare(b.displayName ?? '', 'vi'));
+  const totalPages = Math.max(1, Math.ceil(visibleSlots.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const pageSlots = visibleSlots.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  async function run(action: () => Promise<unknown>, success: string) {
+    setBusy(true); setActionError(''); setMessage('');
+    try { await action(); setForm(null); setMessage(success); await reload(); }
+    catch (reason) { setActionError(reason instanceof Error ? reason.message : 'Thao tác không thành công.'); }
+    finally { setBusy(false); }
+  }
+  function confirm(title: string, description: string, action: () => Promise<unknown>, success: string, destructive = false) {
+    setConfirmation({ title, description, action, success, destructive });
+  }
+
   return (
-    <Screen
-      title={teacher ? "Lớp học & slot" : "Gia đình & slot"}
-      subtitle={
-        teacher
-          ? "Quản lý lớp đang mở và các slot học sinh"
-          : "Quản lý gia đình đang mở và các slot của con"
-      }
-    >
-      <PackageCard
-        name={pack.name}
-        price={pack.price}
-        used={pack.slotsUsed}
-        limit={pack.slotsLimit}
-      />
-      {teacher ? <TeacherClasses /> : <FamilySlots />}
+    <Screen title={teacher ? 'Lớp học' : 'Gia đình'} subtitle="Quản lý nhóm và hồ sơ trực tiếp trên máy chủ">
+      {loading || busy ? <ActivityIndicator color={colors.green} /> : null}
+      {loadError || actionError ? <NoticeBanner kind="error" message={actionError || loadError} onClose={() => setActionError('')}/> : null}
+      {message ? <NoticeBanner kind="success" message={message} onClose={() => setMessage('')}/> : null}
+
+      <View style={styles.plan}>
+        <Image contentFit="cover" contentPosition="right center" source={teacher ? teacherBanner : parentBanner} style={styles.planArt}/>
+        <LinearGradient colors={['rgba(10,43,29,.96)','rgba(10,43,29,.78)','rgba(10,43,29,.2)']} end={{x:1,y:0}} start={{x:0,y:0}} style={styles.planShade}/>
+        <View style={styles.planContent}><View style={styles.header}><View style={styles.flex}><Text style={styles.planLabel}>{teacher?'SỨC CHỨA LỚP HỌC':'HỒ SƠ GIA ĐÌNH'}</Text><Text style={styles.planName}>{active.length}<Text style={styles.planLimit}>/{limit}</Text> {teacher ? 'học sinh' : 'hồ sơ'}</Text></View><Pill color="rgba(232,245,236,.94)">{available} CHỖ TRỐNG</Pill></View>{group ? <Progress value={limit ? active.length / limit * 100 : 0} color={colors.yellow}/> : <View style={styles.planEmpty}><SymbolView name={{ios:'plus.circle.fill',android:'add_circle',web:'add_circle'}} size={16} tintColor={colors.yellow} type="monochrome"/><Text style={styles.planEmptyText}>Tạo nhóm để bắt đầu sử dụng sức chứa</Text></View>}</View>
+      </View>
+
+      {!group && !loading ? <Card style={styles.onboarding}>
+        <View style={styles.onboardingIcon}><SymbolView name={{ios:teacher?'person.3.fill':'house.fill',android:teacher?'groups':'home',web:teacher?'groups':'home'}} size={31} tintColor={colors.greenDark} type="monochrome"/></View>
+        <Text style={styles.onboardingEyebrow}>BƯỚC ĐẦU TIÊN</Text><Text style={styles.onboardingTitle}>{teacher ? 'Tạo lớp học của bạn' : 'Tạo không gian gia đình'}</Text><Text style={styles.onboardingText}>{teacher ? 'Đặt tên lớp, xác nhận đồng ý của phụ huynh rồi thêm hồ sơ học sinh.' : 'Đặt tên nhóm gia đình, sau đó tạo hồ sơ riêng cho từng trẻ.'}</Text>
+        <View style={styles.steps}><View style={styles.step}><Text style={styles.stepNumber}>1</Text><Text style={styles.stepText}>Tạo {teacher?'lớp':'nhóm'}</Text></View><View style={styles.stepLine}/><View style={styles.step}><Text style={styles.stepNumber}>2</Text><Text style={styles.stepText}>Thêm hồ sơ</Text></View><View style={styles.stepLine}/><View style={styles.step}><Text style={styles.stepNumber}>3</Text><Text style={styles.stepText}>Theo dõi</Text></View></View>
+        <ActionButton label={teacher ? '＋ Tạo lớp học' : '＋ Tạo nhóm gia đình'} onPress={() => setForm({ type: 'group' })}/>
+        <Text style={styles.onboardingHint}>Bạn có thể đổi tên hoặc đóng nhóm sau trong phần tùy chọn.</Text>
+      </Card> : null}
+
+      {group ? <>
+        <View style={styles.header}><View style={styles.flex}><Text style={styles.label}>{teacher ? 'LỚP CỦA BẠN' : 'GIA ĐÌNH CỦA BẠN'}</Text><Text style={styles.title}>{group.name}</Text></View><View style={styles.groupTools}><Pressable accessibilityLabel="Làm mới" onPress={reload} style={styles.toolButton}><SymbolView name={{ios:'arrow.clockwise',android:'refresh',web:'refresh'}} size={20} tintColor={colors.greenDark} type="monochrome"/></Pressable>{!isGuest ? <Pressable accessibilityLabel="Mở tùy chọn nhóm" onPress={()=>setShowGroupMenu((value)=>!value)} style={styles.toolButton}><SymbolView name={{ios:'ellipsis',android:'more_horiz',web:'more_horiz'}} size={22} tintColor={colors.ink} type="monochrome"/></Pressable> : null}</View></View>
+        {showGroupMenu?<View style={styles.groupMenu}><View style={styles.groupMenuCopy}><Text style={styles.groupMenuTitle}>Tùy chọn nhóm</Text><Text style={styles.groupMenuText}>Các thao tác ảnh hưởng đến toàn bộ {teacher?'lớp học':'gia đình'}.</Text></View><Pressable onPress={()=>{setShowGroupMenu(false);confirm('Đóng nhóm?','Tất cả slot đang hoạt động sẽ bị thu hồi. Không thể mở lại nhóm này.',()=>groupsApi.close(group.id),'Đã đóng nhóm.',true);}} style={styles.closeGroupButton}><SymbolView name={{ios:'xmark.circle',android:'cancel',web:'cancel'}} size={19} tintColor="#B44F35" type="monochrome"/><Text style={styles.closeGroupText}>Đóng nhóm</Text></Pressable></View>:null}
+        {teacher && !group.consentConfirmed ? <Card style={styles.consent}><Text style={styles.name}>Cần xác nhận sự đồng ý</Text><Text style={styles.meta}>Xác nhận đã có sự đồng ý của phụ huynh trước khi tạo hồ sơ học sinh.</Text><ActionButton label="Xác nhận consent" onPress={() => confirm('Xác nhận sự đồng ý', 'Bạn xác nhận đã có sự đồng ý của phụ huynh học sinh?', () => groupsApi.consent(group.id), 'Đã xác nhận consent.')}/></Card> : null}
+        {!isGuest ? <View style={styles.actions}>
+          {available > 0 ? <ActionButton label="＋ Thêm hồ sơ" onPress={() => setForm({ type: 'slot' })} disabled={teacher && !group.consentConfirmed}/> : null}
+          {teacher && available > 0 ? <ActionButton label="Thêm nhiều" secondary onPress={() => setForm({ type: 'bulk' })} disabled={!group.consentConfirmed}/> : null}
+        </View> : null}
+        <View style={styles.directory}><View style={styles.searchBox}><Text style={styles.searchIcon}>⌕</Text><TextInput value={search} onChangeText={(value) => { setSearch(value); setPage(1); }} autoCapitalize="none" placeholder="Tìm theo tên hoặc mã đăng nhập" placeholderTextColor={colors.muted} style={styles.searchInput}/>{search ? <Pressable accessibilityLabel="Xóa nội dung tìm kiếm" onPress={() => { setSearch(''); setPage(1); }}><Text style={styles.clearSearch}>×</Text></Pressable> : null}</View><View style={styles.filters}><FilterButton label={`Đang hoạt động (${active.length})`} active={filter==='ACTIVE'} onPress={()=>{setFilter('ACTIVE');setPage(1);}}/><FilterButton label={`Ngừng (${slots.length-active.length})`} active={filter==='INACTIVE'} onPress={()=>{setFilter('INACTIVE');setPage(1);}}/><FilterButton label="Tất cả" active={filter==='ALL'} onPress={()=>{setFilter('ALL');setPage(1);}}/></View><View style={styles.resultSummary}><Text style={styles.resultCount}>{visibleSlots.length} {teacher?'học sinh':'hồ sơ'} phù hợp</Text>{visibleSlots.length > 0 ? <Text style={styles.pageCount}>Trang {currentPage}/{totalPages}</Text> : null}</View></View>
+        {pageSlots.map((slot, index) => {
+          const props={slot,onPin:()=>setForm({type:'pin' as const,slot}),onReturn:()=>confirm('Thu hồi hồ sơ?',`Thu hồi ${slot.displayName} và trả lại một chỗ trống?`,()=>slotsApi.return(slot.id),'Đã thu hồi hồ sơ.',true),onRemove:()=>confirm('Xóa dữ liệu?',`Dữ liệu của ${slot.displayName} sẽ bị xóa vĩnh viễn.`,()=>slotsApi.remove(slot.id),'Đã xóa dữ liệu hồ sơ.',true)};
+          return <DirectorySlotRow key={slot.id} index={(currentPage-1)*PAGE_SIZE+index+1} readOnly={isGuest} {...props}/>;
+        })}
+        {totalPages > 1 ? <View style={styles.pagination}><Pressable accessibilityLabel="Trang trước" disabled={currentPage===1} onPress={()=>setPage(Math.max(1,currentPage-1))} style={[styles.pageButton,currentPage===1&&styles.pageButtonDisabled]}><Text style={styles.pageArrow}>‹</Text><Text style={styles.pageButtonText}>Trước</Text></Pressable><View style={styles.pageNumber}><Text style={styles.pageNumberText}>{currentPage}</Text></View><Pressable accessibilityLabel="Trang sau" disabled={currentPage===totalPages} onPress={()=>setPage(Math.min(totalPages,currentPage+1))} style={[styles.pageButton,currentPage===totalPages&&styles.pageButtonDisabled]}><Text style={styles.pageButtonText}>Sau</Text><Text style={styles.pageArrow}>›</Text></Pressable></View> : null}
+        {!loading && slots.length === 0 ? <Text style={styles.empty}>Chưa có hồ sơ nào trong nhóm.</Text> : null}
+        {slots.length > 0 && visibleSlots.length === 0 ? <Text style={styles.empty}>Không tìm thấy hồ sơ phù hợp.</Text> : null}
+      </> : null}
+      <ManagementForm form={form} groupId={group?.id} busy={busy} onClose={() => setForm(null)} onRun={run}/>
+      <ConfirmDialog visible={Boolean(confirmation)} title={confirmation?.title ?? ''} description={confirmation?.description ?? ''} destructive={confirmation?.destructive} busy={busy} onCancel={() => setConfirmation(null)} onConfirm={() => { const current=confirmation; if(!current)return; setConfirmation(null); void run(current.action,current.success); }}/>
     </Screen>
   );
 }
 
-function PackageCard({
-  name,
-  price,
-  used,
-  limit,
-}: {
-  name: string;
-  price: string;
-  used: number;
-  limit: number;
-}) {
-  return (
-    <View style={styles.package}>
-      <View style={styles.packageHead}>
-        <View>
-          <Text style={styles.packageLabel}>GÓI ĐANG SỬ DỤNG</Text>
-          <Text style={styles.packageName}>{name}</Text>
-          <Text style={styles.price}>{price}</Text>
-        </View>
-        <Pill color={colors.greenSoft}>ĐANG HOẠT ĐỘNG</Pill>
-      </View>
-      <View style={styles.usage}>
-        <Text style={styles.usageText}>
-          Đã dùng {used}/{limit} slot
-        </Text>
-        <Text style={styles.usageText}>{limit - used} slot còn lại</Text>
-      </View>
-      <Progress value={(used / limit) * 100} color={colors.yellow} />
-      <View style={styles.packageActions}>
-        <Pressable
-          onPress={() =>
-            Alert.alert(
-              "Tạo slot",
-              "Chức năng sẽ gọi API tạo slot khi backend sẵn sàng.",
-            )
-          }
-          style={styles.createSlot}
-        >
-          <Text style={styles.createSlotText}>＋ Tạo slot</Text>
-        </Pressable>
-        <Pressable
-          onPress={() =>
-            Alert.alert(
-              "Nâng cấp gói",
-              "Màn thanh toán sẽ được nối với luồng mua gói của web.",
-            )
-          }
-          style={styles.upgrade}
-        >
-          <Text style={styles.upgradeText}>Mua / nâng cấp gói</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
+function DirectorySlotRow({ slot, index, onPin, onReturn, onRemove, readOnly = false }: { slot: Slot; index: number; onPin: () => void; onReturn: () => void; onRemove: () => void; readOnly?: boolean }) {
+  const active=slot.status==='ACTIVE';
+  return <View style={[styles.studentRow,!active&&styles.inactive]}>
+    <View style={styles.studentMain}><View style={styles.studentOrder}><Text style={styles.studentIndex}>{String(index).padStart(2,'0')}</Text></View><View style={styles.studentAvatar}><Text style={styles.studentAvatarText}>{slot.displayName?.charAt(0).toUpperCase()}</Text></View><View style={styles.flex}><Text numberOfLines={1} style={styles.studentName}>{slot.displayName||'Đã xóa dữ liệu'}</Text><View style={styles.inlineCode}><Text style={styles.inlineCodeLabel}>MÃ HỒ SƠ</Text><Text selectable style={styles.inlineCodeValue}>{slot.code??'—'}</Text></View></View>{readOnly ? <Pill>CHỈ XEM</Pill> : <View style={[styles.statusBadge,active&&styles.statusBadgeActive]}><View style={[styles.statusDot,active&&styles.statusDotActive]}/><Text style={[styles.statusLabel,active&&styles.statusLabelActive]}>{active?'HOẠT ĐỘNG':'ĐÃ NGỪNG'}</Text></View>}</View>
+    {!readOnly ? <View style={styles.studentActions}>{active?<Pressable accessibilityLabel={`Đổi PIN cho ${slot.displayName}`} onPress={onPin} style={styles.actionButton}><SymbolView name={{ios:'key.fill',android:'key',web:'key'}} size={16} tintColor={colors.greenDark} type="monochrome"/><Text style={styles.actionButtonText}>Đổi PIN</Text></Pressable>:null}{active?<Pressable accessibilityLabel={`Thu hồi ${slot.displayName}`} onPress={onReturn} style={[styles.actionButton,styles.returnButton]}><SymbolView name={{ios:'arrow.uturn.backward.circle',android:'undo',web:'undo'}} size={16} tintColor="#9A654F" type="monochrome"/><Text style={styles.returnButtonText}>Thu hồi</Text></Pressable>:null}{slot.status!=='WIPED'?<Pressable accessibilityLabel={`Xóa ${slot.displayName}`} accessibilityRole="button" onPress={onRemove} style={[styles.actionButton,styles.deleteButton]}><SymbolView name={{ios:'trash',android:'delete',web:'delete'}} size={16} tintColor="#B44F35" type="monochrome"/><Text style={styles.deleteButtonText}>Xóa</Text></Pressable>:null}</View> : null}
+  </View>;
 }
 
-function FamilySlots() {
-  const family = learnerGroups.find(
-    (item) => item.context === "FAMILY" && item.status === "OPEN",
-  );
-  const slots = family?.memberIds
-    .map((id) => learnerDirectory.find((item) => item.id === id))
-    .filter((item): item is (typeof learnerDirectory)[number] => Boolean(item));
-  return (
-    <>
-      <GroupHeader
-        eyebrow="GIA ĐÌNH ĐANG MỞ"
-        name={family?.name ?? "Chưa mở gia đình"}
-        used={slots?.length ?? 0}
-        limit={family?.slotLimit ?? 4}
-      />
-      {slots?.map((item) => (
-        <LearnerRow key={item.id} item={item} />
-      ))}
-    </>
-  );
+function FilterButton({label,active,onPress}:{label:string;active:boolean;onPress:()=>void}){return <Pressable onPress={onPress} style={[styles.filterButton,active&&styles.filterActive]}><Text style={[styles.filterText,active&&styles.filterTextActive]}>{label}</Text></Pressable>;}
+
+function ManagementForm({ form, groupId, busy, onClose, onRun }: { form: FormState; groupId?: string; busy: boolean; onClose: () => void; onRun: (action: () => Promise<unknown>, success: string) => Promise<void> }) {
+  const { session } = useAuth(); const [name,setName]=useState(''); const [pin,setPin]=useState(''); const [bulk,setBulk]=useState(''); const [validation,setValidation]=useState('');
+  if (!form) return null;
+  const currentForm = form;
+  const titles = { group: session?.role === 'TEACHER' ? 'Tạo lớp học' : 'Tạo nhóm gia đình', slot: 'Tạo hồ sơ trẻ', bulk: 'Tạo nhiều hồ sơ', pin: `Đổi PIN · ${form.slot?.displayName ?? ''}` };
+  async function submit() {
+    setValidation('');
+    if (currentForm.type === 'group') { if (!name.trim()) return setValidation('Hãy nhập tên nhóm.'); return onRun(() => groupsApi.create(name, session?.role === 'TEACHER' ? 'CLASS' : 'FAMILY'), 'Đã tạo nhóm.'); }
+    if (!groupId) return setValidation('Không tìm thấy nhóm đang mở.');
+    if (currentForm.type === 'bulk') {
+      try { const items=bulk.split(/\r?\n/).filter(Boolean).map((line)=>{const [displayName,slotPin]=line.split('|').map((v)=>v.trim());if(!displayName||!/^\d{6}$/.test(slotPin))throw new Error(`Dòng không hợp lệ: ${line}`);return {displayName,pin:slotPin};}); if(!items.length) throw new Error('Hãy nhập ít nhất một hồ sơ.'); return onRun(() => slotsApi.createBulk(groupId, items), `Đã tạo ${items.length} hồ sơ.`); } catch(reason) { return setValidation(reason instanceof Error ? reason.message : 'Danh sách không hợp lệ.'); }
+    }
+    if (!/^\d{6}$/.test(pin)) return setValidation('PIN phải gồm đúng 6 chữ số.');
+    if (currentForm.type === 'pin' && currentForm.slot) return onRun(() => slotsApi.changePin(currentForm.slot!.id, pin), 'Đã đổi PIN và mở khóa hồ sơ.');
+    if (!name.trim()) return setValidation('Hãy nhập tên trẻ.');
+    return onRun(() => slotsApi.create({ groupId, displayName: name, pin }), 'Đã tạo hồ sơ trẻ. Hãy lưu lại mã đăng nhập được trả về.');
+  }
+  return <Modal visible transparent animationType="slide" onRequestClose={onClose}><KeyboardAvoidingView behavior={Platform.OS==='ios'?'padding':undefined} style={styles.overlay}><View style={styles.modal}><ScrollView keyboardShouldPersistTaps="handled"><Text style={styles.modalTitle}>{titles[form.type]}</Text>{form.type==='group'||form.type==='slot'?<TextInput placeholder={form.type==='group'?'Tên nhóm':'Tên trẻ'} value={name} onChangeText={setName} style={styles.input}/>:null}{form.type==='slot'||form.type==='pin'?<TextInput secureTextEntry keyboardType="number-pad" maxLength={6} placeholder="PIN gồm 6 chữ số" value={pin} onChangeText={(v)=>setPin(v.replace(/\D/g,''))} style={styles.input}/>:null}{form.type==='bulk'?<TextInput multiline numberOfLines={8} placeholder={'Nguyễn An | 012345\nTrần Bình | 654321'} value={bulk} onChangeText={setBulk} style={[styles.input,styles.textarea]}/>:null}{validation?<Text style={styles.errorText}>{validation}</Text>:null}<View style={styles.actions}><ActionButton secondary label="Hủy" onPress={onClose}/><ActionButton label="Lưu" disabled={busy} onPress={()=>void submit()}/></View></ScrollView></View></KeyboardAvoidingView></Modal>;
 }
 
-function TeacherClasses() {
-  const openClass = learnerGroups.find(
-    (item) => item.context === "CLASS" && item.status === "OPEN",
-  );
-  const closedClasses = learnerGroups.filter(
-    (item) => item.context === "CLASS" && item.status === "CLOSED",
-  );
-  const members = openClass?.memberIds
-    .map((id) => learnerDirectory.find((item) => item.id === id))
-    .filter((item): item is (typeof learnerDirectory)[number] => Boolean(item));
-
-  return (
-    <>
-      <View style={styles.classSection}>
-        <GroupHeader
-          eyebrow={`LỚP ĐANG MỞ · NĂM HỌC ${openClass?.schoolYear ?? "—"}`}
-          name={openClass?.name ?? "Chưa mở lớp"}
-          used={members?.length ?? 0}
-          limit={openClass?.slotLimit ?? 40}
-        />
-        {members?.map((member) => (
-          <LearnerRow key={member.id} item={member} />
-        ))}
-      </View>
-
-      {closedClasses.length > 0 && (
-        <View style={styles.archiveSection}>
-          <SectionTitle>Lớp đã kết thúc</SectionTitle>
-          {closedClasses.map((item) => (
-            <Card key={item.id} style={styles.archiveCard}>
-              <View style={styles.archiveCopy}>
-                <Text style={styles.archiveName}>{item.name}</Text>
-                <Text style={styles.archiveMeta}>
-                  Năm học {item.schoolYear} · Đã đóng {item.closedAt}
-                </Text>
-                <Text style={styles.archiveNote}>
-                  Báo cáo đã được đông cứng · Slot đã hoàn trả
-                </Text>
-              </View>
-              <Text style={styles.archiveLink}>Xem báo cáo ›</Text>
-            </Card>
-          ))}
-        </View>
-      )}
-    </>
-  );
-}
-
-function GroupHeader({
-  eyebrow,
-  name,
-  used,
-  limit,
-}: {
-  eyebrow: string;
-  name: string;
-  used: number;
-  limit: number;
-}) {
-  return (
-    <View style={styles.classHead}>
-      <View style={styles.groupTitleCopy}>
-        <Text style={styles.classLabel}>{eyebrow}</Text>
-        <Text style={styles.className}>{name}</Text>
-      </View>
-      <View style={styles.classCount}>
-        <Text style={styles.classCountValue}>{used}</Text>
-        <Text style={styles.classCountLabel}>/{limit} slot</Text>
-      </View>
-    </View>
-  );
-}
-
-function LearnerRow({
-  item,
-  compact = false,
-}: {
-  item: (typeof learnerDirectory)[number];
-  compact?: boolean;
-}) {
-  const done = Number(item.chaptersDone);
-  return (
-    <Pressable
-      onPress={() =>
-        router.push({
-          pathname: "/learner/[id]",
-          params: { id: item.id },
-        } as never)
-      }
-      style={({ pressed }) => [styles.rowPress, pressed && styles.pressed]}
-    >
-      <View style={[styles.learner, compact && styles.learnerCompact]}>
-        <View style={[styles.avatar, { backgroundColor: item.color }]}>
-          <Text style={styles.avatarText}>{item.initial}</Text>
-        </View>
-        <View style={styles.copy}>
-          <Text style={styles.name}>{item.name}</Text>
-          <Text style={styles.meta}>
-            {item.code} · {done}/8 chương
-          </Text>
-        </View>
-        <Pill color={colors.yellowSoft} textColor="#7C6200">
-          CHƯƠNG {Math.min(done + 1, 8)}
-        </Pill>
-        <Text style={styles.arrow}>›</Text>
-      </View>
-    </Pressable>
-  );
+function ActionButton({ label, onPress, secondary=false, danger=false, disabled=false, small=false }: { label:string; onPress:()=>void; secondary?:boolean; danger?:boolean; disabled?:boolean; small?:boolean }) {
+  return <Pressable disabled={disabled} onPress={onPress} style={({pressed})=>[styles.button,small&&styles.buttonSmall,secondary&&styles.buttonSecondary,danger&&styles.buttonDanger,pressed&&styles.buttonPressed,disabled&&styles.buttonDisabled]}><Text style={[styles.buttonText,secondary&&styles.buttonTextSecondary,danger&&styles.buttonTextDanger]}>{label}</Text></Pressable>;
 }
 
 const styles = StyleSheet.create({
-  package: {
-    padding: 19,
-    borderRadius: radius.xl,
-    backgroundColor: colors.ink,
-    ...shadow.card,
-  },
-  packageHead: { flexDirection: "row", justifyContent: "space-between" },
-  packageLabel: { ...type.eyebrow, color: "#A9CABB" },
-  packageName: {
-    color: colors.white,
-    fontSize: 19,
-    fontWeight: "900",
-    marginTop: 5,
-  },
-  price: { color: "#C5D8CE", fontSize: 10, marginTop: 3 },
-  usage: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 18,
-    marginBottom: 8,
-  },
-  usageText: { color: "#C5D8CE", fontSize: 9 },
-  packageActions: { flexDirection: "row", gap: 8, marginTop: 15 },
-  createSlot: {
-    flex: 1,
-    height: 43,
-    borderRadius: radius.md,
-    backgroundColor: colors.yellow,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  createSlotText: { color: colors.ink, fontSize: 11, fontWeight: "900" },
-  upgrade: {
-    flex: 1,
-    height: 43,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: "#557565",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  upgradeText: { color: colors.white, fontSize: 10, fontWeight: "900" },
-  classSection: { gap: 10 },
-  classHead: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  groupTitleCopy: { flex: 1, paddingRight: 12 },
-  classLabel: { ...type.eyebrow, color: colors.green, fontSize: 8 },
-  className: { ...type.h2, color: colors.ink, marginTop: 3 },
-  classCount: {
-    width: 52,
-    height: 52,
-    borderRadius: 17,
-    backgroundColor: colors.purpleSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  classCountValue: { color: colors.purple, fontSize: 18, fontWeight: "900" },
-  classCountLabel: { color: colors.muted, fontSize: 8 },
-  archiveSection: { gap: 10, marginTop: 8 },
-  archiveCard: {
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  archiveCopy: { flex: 1 },
-  archiveName: { color: colors.ink, fontSize: 12, fontWeight: "900" },
-  archiveMeta: { color: colors.muted, fontSize: 9, marginTop: 3 },
-  archiveNote: { color: colors.greenDark, fontSize: 9, marginTop: 5 },
-  archiveLink: { color: colors.purple, fontSize: 9, fontWeight: "900" },
-  rowPress: { borderRadius: radius.md },
-  learner: {
-    minHeight: 72,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: colors.white,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.line,
-    ...shadow.card,
-  },
-  learnerCompact: {
-    minHeight: 62,
-    padding: 8,
-    marginTop: 7,
-    backgroundColor: colors.canvas,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: { color: colors.ink, fontWeight: "900" },
-  copy: { flex: 1 },
-  name: { color: colors.ink, fontSize: 13, fontWeight: "900" },
-  meta: { color: colors.muted, fontSize: 9, marginTop: 3 },
-  arrow: { color: colors.greenDark, fontSize: 23 },
-  pressed: { opacity: 0.7 },
+  plan:{height:150,borderRadius:26,backgroundColor:colors.ink,overflow:'hidden',...shadow.large},planArt:{position:'absolute',inset:0,width:'100%',height:'100%'},planShade:{position:'absolute',inset:0},planContent:{flex:1,padding:19,justifyContent:'space-between'},header:{flexDirection:'row',alignItems:'center',gap:12},flex:{flex:1},planLabel:{...type.eyebrow,color:'#C7D9D0'},planName:{color:colors.white,fontSize:22,fontWeight:'900',marginTop:6},planLimit:{color:'#A9CABB',fontSize:15},label:{...type.eyebrow,color:colors.green},title:{...type.h2,color:colors.ink,marginTop:4},groupTools:{flexDirection:'row',gap:8},toolButton:{width:44,height:44,borderRadius:14,backgroundColor:colors.white,borderWidth:1,borderColor:colors.line,alignItems:'center',justifyContent:'center'},groupMenu:{padding:15,borderRadius:18,backgroundColor:colors.white,borderWidth:1,borderColor:colors.line,flexDirection:'row',alignItems:'center',gap:12,...shadow.card},groupMenuCopy:{flex:1},groupMenuTitle:{color:colors.ink,fontSize:13,fontWeight:'900'},groupMenuText:{color:colors.muted,fontSize:9,lineHeight:14,marginTop:3},closeGroupButton:{minHeight:44,paddingHorizontal:12,borderRadius:13,backgroundColor:colors.coralSoft,flexDirection:'row',alignItems:'center',gap:6},closeGroupText:{color:'#B44F35',fontSize:10,fontWeight:'900'},refresh:{minHeight:44,paddingHorizontal:13,borderRadius:14,backgroundColor:colors.greenSoft,alignItems:'center',justifyContent:'center'},refreshText:{color:colors.greenDark,fontSize:12,fontWeight:'900'},consent:{backgroundColor:colors.yellowSoft},slot:{gap:12},slotTop:{flexDirection:'row',alignItems:'center',gap:11},inactive:{opacity:.65},avatar:{width:46,height:46,borderRadius:radius.md,backgroundColor:colors.yellowSoft,alignItems:'center',justifyContent:'center'},avatarText:{color:'#705800',fontWeight:'900'},name:{color:colors.ink,fontSize:14,fontWeight:'900'},meta:{color:colors.muted,fontSize:11,lineHeight:17,marginTop:4},codeBox:{backgroundColor:colors.ink,borderRadius:radius.lg,paddingVertical:14,paddingHorizontal:16,alignItems:'center',borderWidth:2,borderColor:colors.yellow},codeLabel:{color:colors.yellow,fontSize:9,fontWeight:'900',letterSpacing:1.2},codeValue:{color:colors.white,fontSize:26,fontWeight:'900',letterSpacing:4,marginTop:5},codeHint:{color:'#BFD2C8',fontSize:9,marginTop:4},directory:{gap:11},searchBox:{height:56,flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:15,borderRadius:17,backgroundColor:colors.white,borderWidth:1,borderColor:colors.line,...shadow.card},searchIcon:{color:colors.greenDark,fontSize:26},searchInput:{flex:1,color:colors.ink,fontSize:14},clearSearch:{color:colors.muted,fontSize:26,paddingHorizontal:4},filters:{flexDirection:'row',gap:7},filterButton:{flex:1,minHeight:46,paddingHorizontal:7,borderRadius:15,backgroundColor:colors.white,borderWidth:1,borderColor:colors.line,alignItems:'center',justifyContent:'center'},filterActive:{backgroundColor:colors.ink,borderColor:colors.ink},filterText:{color:colors.muted,fontSize:10,fontWeight:'800',textAlign:'center'},filterTextActive:{color:colors.yellow},resultSummary:{flexDirection:'row',alignItems:'center',justifyContent:'space-between'},resultCount:{color:colors.muted,fontSize:11,fontWeight:'700'},pageCount:{color:colors.greenDark,fontSize:11,fontWeight:'900'},studentRow:{borderRadius:20,backgroundColor:colors.white,borderWidth:1,borderColor:colors.line,overflow:'hidden',...shadow.card},studentMain:{minHeight:82,flexDirection:'row',alignItems:'center',gap:10,paddingHorizontal:13,paddingVertical:12},studentOrder:{width:27,height:27,borderRadius:9,backgroundColor:colors.canvas,alignItems:'center',justifyContent:'center'},studentIndex:{color:colors.muted,fontSize:9,fontWeight:'900'},studentAvatar:{width:49,height:49,borderRadius:16,backgroundColor:colors.yellowSoft,alignItems:'center',justifyContent:'center'},studentAvatarText:{color:colors.ink,fontSize:16,fontWeight:'900'},studentName:{color:colors.ink,fontSize:14,fontWeight:'900'},inlineCode:{flexDirection:'row',alignItems:'center',gap:6,marginTop:5},inlineCodeLabel:{color:colors.greenDark,fontSize:8,fontWeight:'900'},inlineCodeValue:{color:colors.ink,fontSize:11,fontWeight:'900',letterSpacing:1.2},statusBadge:{paddingHorizontal:8,paddingVertical:6,borderRadius:10,backgroundColor:'#ECEFED',flexDirection:'row',alignItems:'center',gap:5},statusBadgeActive:{backgroundColor:colors.greenSoft},statusDot:{width:6,height:6,borderRadius:3,backgroundColor:colors.muted},statusDotActive:{backgroundColor:colors.green},statusLabel:{color:colors.muted,fontSize:7,fontWeight:'900'},statusLabelActive:{color:colors.greenDark},studentActions:{minHeight:52,flexDirection:'row',alignItems:'center',gap:8,paddingHorizontal:12,paddingVertical:8,borderTopWidth:1,borderTopColor:colors.line,backgroundColor:'#FAFBF8'},actionButton:{flex:1,minHeight:36,borderRadius:11,backgroundColor:colors.greenSoft,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:6},actionButtonText:{color:colors.greenDark,fontSize:9,fontWeight:'900'},returnButton:{backgroundColor:'#FFF3E9'},returnButtonText:{color:'#9A654F',fontSize:9,fontWeight:'900'},deleteButton:{backgroundColor:colors.coralSoft},deleteButtonText:{color:'#B44F35',fontSize:9,fontWeight:'900'},pagination:{flexDirection:'row',alignItems:'center',justifyContent:'center',gap:12,paddingTop:6,paddingBottom:4},pageButton:{minWidth:98,height:48,paddingHorizontal:14,borderRadius:15,backgroundColor:colors.white,borderWidth:1,borderColor:colors.line,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:7},pageButtonDisabled:{opacity:.38},pageButtonText:{color:colors.greenDark,fontSize:12,fontWeight:'900'},pageArrow:{color:colors.greenDark,fontSize:22,lineHeight:24},pageNumber:{width:44,height:44,borderRadius:15,backgroundColor:colors.ink,alignItems:'center',justifyContent:'center'},pageNumberText:{color:colors.yellow,fontSize:14,fontWeight:'900'},actions:{flexDirection:'row',flexWrap:'wrap',gap:10,marginTop:10},button:{minHeight:54,paddingHorizontal:19,borderRadius:17,backgroundColor:colors.ink,alignItems:'center',justifyContent:'center',...shadow.button},buttonSmall:{minHeight:46,paddingHorizontal:15},buttonSecondary:{backgroundColor:colors.white,borderWidth:1,borderColor:colors.line,shadowOpacity:0},buttonDanger:{backgroundColor:colors.white,borderWidth:1,borderColor:'#EDC1B7',shadowOpacity:0},buttonPressed:{opacity:.76,transform:[{scale:.985}]},buttonDisabled:{opacity:.42},buttonText:{color:colors.white,fontWeight:'900',fontSize:12},buttonTextSecondary:{color:colors.greenDark},buttonTextDanger:{color:'#B44F35'},error:{backgroundColor:colors.coralSoft,borderColor:'#F0B9AA'},errorText:{color:'#B44F35',fontWeight:'700',fontSize:12},success:{backgroundColor:colors.greenSoft,borderColor:'#BDE5CF'},successText:{color:colors.greenDark,fontWeight:'700'},empty:{color:colors.muted,textAlign:'center',padding:20},overlay:{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(15,42,29,.35)'},modal:{maxHeight:'85%',backgroundColor:colors.white,borderTopLeftRadius:radius.xxl,borderTopRightRadius:radius.xxl,padding:spacing.lg},modalTitle:{...type.h2,color:colors.ink,marginBottom:16},input:{minHeight:54,borderWidth:1.5,borderColor:colors.line,borderRadius:17,paddingHorizontal:14,color:colors.ink,fontSize:14,marginBottom:12},textarea:{height:180,textAlignVertical:'top',paddingTop:12},
+  planEmpty:{height:28,borderRadius:10,backgroundColor:'rgba(255,255,255,.12)',flexDirection:'row',alignItems:'center',gap:7,paddingHorizontal:10},planEmptyText:{color:'#D8E7DF',fontSize:9,fontWeight:'700'},onboarding:{minHeight:330,alignItems:'center',paddingHorizontal:22,paddingVertical:25},onboardingIcon:{width:68,height:68,borderRadius:23,backgroundColor:colors.greenSoft,alignItems:'center',justifyContent:'center'},onboardingEyebrow:{...type.eyebrow,color:colors.greenDark,marginTop:16},onboardingTitle:{color:colors.ink,fontFamily:'Fraunces_700Bold',fontSize:24,lineHeight:30,textAlign:'center',marginTop:5},onboardingText:{color:colors.muted,fontSize:11,lineHeight:17,textAlign:'center',maxWidth:285,marginTop:7},steps:{width:'100%',flexDirection:'row',alignItems:'flex-start',justifyContent:'center',marginVertical:22},step:{width:72,alignItems:'center',gap:7},stepNumber:{width:31,height:31,borderRadius:11,backgroundColor:colors.ink,color:colors.yellow,textAlign:'center',textAlignVertical:'center',fontSize:11,fontWeight:'900',overflow:'hidden'},stepText:{color:colors.inkSoft,fontSize:9,fontWeight:'800',textAlign:'center'},stepLine:{flex:1,height:1,backgroundColor:colors.line,marginTop:15},onboardingHint:{color:colors.muted,fontSize:9,lineHeight:14,textAlign:'center',marginTop:13},
 });

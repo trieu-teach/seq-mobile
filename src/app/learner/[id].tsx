@@ -51,6 +51,8 @@ export default function LearnerDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Card style={styles.profile}>
+          <Image source={require('../../../assets/images/finteen/learner-detail-bg-v3.png')} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="center" />
+          <View style={styles.profileShade} />
           <View style={[styles.avatar, { backgroundColor: person.color }]}>
             <Text style={styles.avatarText}>{person.initial}</Text>
           </View>
@@ -193,7 +195,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   content: { padding: spacing.lg, paddingBottom: 50, gap: spacing.lg },
-  profile: { flexDirection: "row", alignItems: "center", gap: 12 },
+  profile: { minHeight: 205, flexDirection: "row", alignItems: "flex-end", gap: 12, overflow: "hidden", padding: 17 },
+  profileShade: { position: "absolute", inset: 0, backgroundColor: "rgba(8,40,27,.48)" },
   avatar: {
     width: 58,
     height: 58,
@@ -203,9 +206,9 @@ const styles = StyleSheet.create({
   },
   avatarText: { fontSize: 22, fontWeight: "900", color: colors.ink },
   profileCopy: { flex: 1 },
-  name: { color: colors.ink, fontSize: 16, fontWeight: "900" },
-  meta: { color: colors.muted, fontSize: 10, marginTop: 3 },
-  active: { color: colors.greenDark, fontSize: 9, marginTop: 4 },
+  name: { color: colors.white, fontSize: 16, fontWeight: "900" },
+  meta: { color: "#E4EFE9", fontSize: 10, marginTop: 3 },
+  active: { color: colors.yellow, fontSize: 9, marginTop: 4 },
   stats: { flexDirection: "row", gap: 9 },
   stat: { flex: 1, padding: 12, alignItems: "center" },
   statValue: { color: colors.greenDark, fontSize: 21, fontWeight: "900" },

@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { StyleSheet, Text, View } from "react-native";
 import { Screen } from "@/components/screen";
 import { Card, Pill, SectionTitle } from "@/components/ui";
-import { achievements, dailySummary, learners } from "@/data/dashboard";
+import { achievements, dailySummary } from "@/data/dashboard";
 import { colors, radius, type } from "@/theme/tokens";
 export default function SummariesScreen() {
   return (
@@ -10,7 +10,7 @@ export default function SummariesScreen() {
       title="Tổng kết"
       subtitle="Báo cáo theo chương và tổng kết hằng ngày"
     >
-      <View style={styles.reportHero}><Image source={learners[0].chapters.at(-1)?.image} style={styles.reportImage} contentFit="cover" /><View style={styles.reportShade}/><View style={styles.reportCopy}><Text style={styles.reportKicker}>CÂU CHUYỆN MỚI NHẤT</Text><Text style={styles.reportTitle}>Căn nhà mơ ước</Text><Text style={styles.reportSubtitle}>Một chương về lựa chọn, trách nhiệm và mục tiêu gia đình.</Text></View></View>
+      <View style={styles.reportHero}><Image source={require('../../../assets/images/finteen/rewards-bg-v3.png')} style={styles.reportImage} contentFit="cover" contentPosition="center" /><View style={styles.reportShade}/><View style={styles.reportCopy}><Text style={styles.reportKicker}>THÀNH TỰU GẦN ĐÂY</Text><Text style={styles.reportTitle}>Mỗi bước nhỏ đều đáng tự hào</Text><Text style={styles.reportSubtitle}>Theo dõi huy hiệu, chứng chỉ và những cột mốc mới của trẻ.</Text></View></View>
       <Card style={styles.summary}>
         <View style={styles.summaryTop}>
           <View style={styles.ai}>

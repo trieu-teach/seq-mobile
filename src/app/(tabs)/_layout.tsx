@@ -1,16 +1,16 @@
+import { SymbolView } from "expo-symbols";
 import { Tabs } from "expo-router";
-import { StyleSheet, Text } from "react-native";
-
+import { StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/features/auth/auth-context";
-import { colors } from "@/theme/tokens";
+import { colors, shadow } from "@/theme/tokens";
 
-const icons: Record<string, string> = {
-  index: "⌂",
-  journey: "♙",
-  quiz: "◈",
-  rewards: "✦",
-  profile: "●",
-};
+const icons = {
+  index: { ios: "house.fill", android: "home", web: "home" },
+  journey: { ios: "person.2.fill", android: "groups", web: "groups" },
+  quiz: { ios: "questionmark.circle.fill", android: "quiz", web: "quiz" },
+  rewards: { ios: "sparkles", android: "workspace_premium", web: "workspace_premium" },
+  profile: { ios: "person.crop.circle.fill", android: "account_circle", web: "account_circle" },
+} as const;
 
 export default function TabsLayout() {
   const { session } = useAuth();
@@ -19,26 +19,29 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarActiveTintColor: colors.greenDark,
-        tabBarInactiveTintColor: "#8A9690",
-        tabBarLabelStyle: styles.label,
+        tabBarActiveTintColor: colors.ink,
+        tabBarInactiveTintColor: "#87938C",
+        tabBarHideOnKeyboard: true,
+        tabBarItemStyle: styles.item,
         tabBarStyle: styles.bar,
-        tabBarIcon: ({ focused, color }) => (
-          <Text style={[styles.icon, { color }, focused && styles.activeIcon]}>
-            {icons[route.name]}
-          </Text>
+        tabBarIcon: ({ focused }) => (
+          <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+            <SymbolView
+              name={icons[route.name as keyof typeof icons] as never}
+              size={focused ? 22 : 21}
+              tintColor={focused ? colors.yellow : "#87938C"}
+              type="monochrome"
+            />
+          </View>
+        ),
+        tabBarLabel: ({ children, focused }) => (
+          <Text numberOfLines={1} style={[styles.label, focused && styles.labelActive]}>{children}</Text>
         ),
       })}
     >
       <Tabs.Screen name="index" options={{ title: "Tổng quan" }} />
-      <Tabs.Screen
-        name="journey"
-        options={{ title: teacher ? "Lớp học" : "Gia đình" }}
-      />
-      <Tabs.Screen
-        name="quiz"
-        options={{ title: teacher ? "Quiz" : "Kiến thức" }}
-      />
+      <Tabs.Screen name="journey" options={{ title: teacher ? "Lớp học" : "Gia đình" }} />
+      <Tabs.Screen name="quiz" options={{ title: teacher ? "Quiz" : "Kiến thức" }} />
       <Tabs.Screen name="rewards" options={{ title: "Tổng kết" }} />
       <Tabs.Screen name="profile" options={{ title: "Tài khoản" }} />
     </Tabs>
@@ -47,13 +50,39 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   bar: {
-    height: 76,
-    paddingTop: 8,
-    paddingBottom: 10,
+    height: 84,
+    paddingTop: 7,
+    paddingBottom: 9,
+    paddingHorizontal: 5,
     backgroundColor: colors.white,
-    borderTopColor: colors.line,
+    borderTopWidth: 0,
+    ...shadow.large,
   },
-  label: { fontSize: 9, fontWeight: "800" },
-  icon: { fontSize: 20, lineHeight: 22 },
-  activeIcon: { transform: [{ scale: 1.12 }] },
+  item: { paddingVertical: 2 },
+  iconWrap: {
+    width: 44,
+    height: 34,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconWrapActive: {
+    backgroundColor: colors.ink,
+    shadowColor: colors.ink,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  label: {
+    color: "#87938C",
+    fontSize: 9,
+    fontWeight: "700",
+    marginTop: 2,
+  },
+  labelActive: {
+    color: colors.ink,
+    fontSize: 10,
+    fontWeight: "900",
+  },
 });

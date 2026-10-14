@@ -1,0 +1,11 @@
+export type AccountPlan = 'PARENT' | 'TEACHER';
+export type GroupContext = 'FAMILY' | 'CLASS';
+export type Account = { id: string; email: string; displayName: string; phone?: string | null; plans: AccountPlan[]; roles: string[] };
+export type TokenResult = { accessToken: string; refreshToken?: string | null; expiresIn: number };
+export type Entitlement = { id: string; kind: AccountPlan; startsOn: string; expiresOn: string; [key: string]: unknown };
+export type Group = { id: string; name: string; context: GroupContext; status?: string; closedAt?: string | null; consentConfirmed?: boolean; slotLimit?: number; slotUsed?: number; [key: string]: unknown };
+export type Slot = { id: string; code?: string; displayName: string; badge?: string | null; status?: string; locked?: boolean; groupContext?: GroupContext; [key: string]: unknown };
+export type GroupCapacity = number;
+export type Plan = { kind: AccountPlan; price: number; months: number; updatedAt?: string };
+export type Payment = { orderCode: number; qrCode?: string; bin: string; accountNumber: string; accountName: string; amount: number; description: string; expiresAt: string };
+export type PaymentStatus = { orderCode: number; status: 'PENDING' | 'PAID' | 'FAILED'; amount: number; paidAt?: string | null };

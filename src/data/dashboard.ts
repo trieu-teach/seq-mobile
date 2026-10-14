@@ -139,60 +139,33 @@ export const learnerDirectory = [
   },
 ] as const;
 
-export const servicePackages = {
+export const activePlans = {
   PARENT: {
     name: "FinTeen Gia đình",
-    price: "299.000đ/năm",
-    slotsUsed: 2,
-    slotsLimit: 4,
+    status: "ACTIVE",
   },
   TEACHER: {
-    name: "FinTeen Trường học",
-    price: "Liên hệ nhà trường",
-    slotsUsed: 4,
-    slotsLimit: 40,
+    name: "FinTeen Lớp học",
+    status: "ACTIVE",
   },
 } as const;
 
-export const learnerGroups = [
-  {
-    id: "class-10a2",
-    context: "CLASS",
-    name: "Lớp 10A2",
-    schoolYear: "2026–2027",
-    status: "OPEN",
-    slotLimit: 40,
-    memberIds: ["slot-minh", "slot-thao", "slot-khang", "slot-vy"],
-  },
-  {
-    id: "class-11b1",
-    context: "CLASS",
-    name: "Lớp 11B1",
-    schoolYear: "2025–2026",
-    status: "CLOSED",
-    slotLimit: 40,
-    memberIds: [],
-    closedAt: "30/05/2026",
-  },
-  {
-    id: "family-an",
-    context: "FAMILY",
-    name: "Gia đình của An",
-    schoolYear: null,
-    status: "OPEN",
-    slotLimit: 4,
-    memberIds: ["slot-an", "slot-linh"],
-  },
-] as const satisfies readonly {
-  id: string;
-  context: "CLASS" | "FAMILY";
-  name: string;
-  schoolYear: string | null;
-  status: "OPEN" | "CLOSED";
-  slotLimit: number;
-  memberIds: readonly string[];
-  closedAt?: string;
-}[];
+// Mobile chỉ phản ánh phạm vi đã được cấp trên web. Giáo viên quản lý đúng
+// một lớp; học sinh thuộc trực tiếp lớp, không có tầng nhóm trung gian.
+export const teacherClass = {
+  id: "class-10a2",
+  name: "Lớp 10A2",
+  schoolYear: "2026–2027",
+  studentLimit: 40,
+  studentIds: ["slot-minh", "slot-thao", "slot-khang", "slot-vy"],
+} as const;
+
+export const familyAccount = {
+  id: "family-an",
+  name: "Gia đình của An",
+  childLimit: 4,
+  childIds: ["slot-an", "slot-linh"],
+} as const;
 
 export const quizLiveProgress = [
   {
