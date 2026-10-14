@@ -5,6 +5,17 @@ import { ApiError, authApi, type Account, type AccountPlan, type TokenResult } f
 import { setApiAccessToken } from '@/api/client';
 
 const SESSION_KEY = 'finteen.account.session.v1';
+const MOBILE_ROLE_ERROR_MESSAGE =
+  'Ứng dụng này chỉ dành cho khách, phụ huynh và giáo viên. Vui lòng sử dụng đúng cổng đăng nhập.';
+const ALLOWED_MOBILE_ROLES = new Set(['GUEST', 'PARENT', 'TEACHER', 'ACCOUNT', 'USER']);
+
+class UnsupportedMobileRoleError extends Error {
+  constructor() {
+    super(MOBILE_ROLE_ERROR_MESSAGE);
+    this.name = 'UnsupportedMobileRoleError';
+  }
+}
+
 export type AccountRole = AccountPlan;
 export type Session = {
   account: Account;
@@ -21,7 +32,26 @@ type AuthContextValue = { isGuest: boolean; isLoading: boolean; session: Session
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function messageOf(error: unknown) { return error instanceof ApiError || error instanceof Error ? error.message : 'Đã có lỗi xảy ra. Vui lòng thử lại.'; }
+function normalizeRole(role: string) {
+  return role.trim().toUpperCase().replace(/^ROLE_/, '');
+}
+
+function assertMobileAccess(account: Account) {
+  const roles = Array.isArray(account.roles)
+    ? account.roles.map(normalizeRole).filter(Boolean)
+    : [];
+  const plans = Array.isArray(account.plans) ? account.plans : [];
+
+  if (
+    roles.some((role) => !ALLOWED_MOBILE_ROLES.has(role)) ||
+    plans.some((plan) => plan !== 'PARENT' && plan !== 'TEACHER')
+  ) {
+    throw new UnsupportedMobileRoleError();
+  }
+}
+
 function allowedRole(account: Account, preferred?: AccountRole) {
+  assertMobileAccess(account);
   if (preferred && account.plans.includes(preferred)) return preferred;
   return account.plans.find((plan) => plan === 'PARENT' || plan === 'TEACHER') ?? 'PARENT';
 }
@@ -58,7 +88,12 @@ export function AuthProvider({ children }: PropsWithChildren) {
       };
       setSession(next); await storeSession(next);
       return next;
-    } catch (error) { setApiAccessToken(null); throw error; }
+    } catch (error) {
+      setApiAccessToken(null);
+      setSession(null);
+      await storeSession(null);
+      throw error;
+    }
   }
   useEffect(() => {
     void (async () => {
@@ -77,7 +112,23 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const value = useMemo<AuthContextValue>(() => ({
     isGuest, isLoading, session,
     continueAsGuest() { setIsGuest(true); },
-    async refreshAccount() { try { if (!session) throw new ApiError('Vui lòng đăng nhập lại.'); const account = await authApi.me(); const next = { ...session, account, role: allowedRole(account, session.role) }; setSession(next); await storeSession(next); return { ok: true }; } catch (error) { return { ok: false, message: messageOf(error) }; } },
+    async refreshAccount() {
+      try {
+        if (!session) throw new ApiError('Vui lòng đăng nhập lại.');
+        const account = await authApi.me();
+        const next = { ...session, account, role: allowedRole(account, session.role) };
+        setSession(next);
+        await storeSession(next);
+        return { ok: true };
+      } catch (error) {
+        if (error instanceof UnsupportedMobileRoleError) {
+          setApiAccessToken(null);
+          setSession(null);
+          await storeSession(null);
+        }
+        return { ok: false, message: messageOf(error) };
+      }
+    },
     async register(email, password, displayName, phone) { try { await authApi.register(email, password, displayName, phone); return { ok: true }; } catch (error) { return { ok: false, message: messageOf(error) }; } },
     async verifyRegistration(email, otp) { try { const next = await establishSession(await authApi.verify(email, otp)); setIsGuest(false); return { ok: true, hasPlan: next.account.plans.length > 0 }; } catch (error) { return { ok: false, message: messageOf(error) }; } },
     async resendVerification(email) { try { await authApi.resendVerification(email); return { ok: true }; } catch (error) { return { ok: false, message: messageOf(error) }; } },

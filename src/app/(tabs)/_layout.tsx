@@ -41,8 +41,8 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: "Tổng quan" }} />
       <Tabs.Screen name="journey" options={{ title: teacher ? "Lớp học" : "Gia đình" }} />
-      <Tabs.Screen name="quiz" options={{ title: teacher ? "Quiz" : "Kiến thức" }} />
-      <Tabs.Screen name="rewards" options={{ title: "Tổng kết" }} />
+      <Tabs.Screen name="quiz" options={{ title: "Quiz", href: teacher ? undefined : null }} />
+      <Tabs.Screen name="rewards" options={{ title: "Tổng kết", href: null }} />
       <Tabs.Screen name="profile" options={{ title: "Tài khoản" }} />
     </Tabs>
   );
