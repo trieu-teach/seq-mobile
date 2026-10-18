@@ -1,7 +1,7 @@
 import { apiConfig } from './config';
 
 type ApiEnvelope<T> = { code: number; message?: string; result: T };
-type RequestOptions = { method?: 'GET' | 'POST' | 'DELETE'; body?: unknown; authenticated?: boolean };
+type RequestOptions = { method?: 'GET' | 'POST' | 'PUT' | 'DELETE'; body?: unknown; authenticated?: boolean };
 let accessToken: string | null = null;
 
 export class ApiError extends Error {

@@ -8,4 +8,5 @@ export const groupsApi = {
   capacity: (groupId: string) => apiRequest<GroupCapacity>(`/api/groups/${idPath(groupId)}/capacity`, { authenticated: true }),
   consent: (groupId: string) => apiRequest<void>(`/api/groups/${idPath(groupId)}/consent`, { authenticated: true, method: 'POST' }),
   close: (groupId: string) => apiRequest<void>(`/api/groups/${idPath(groupId)}/close`, { authenticated: true, method: 'POST' }),
+  setPostTest: (groupId: string, enabled: boolean) => apiRequest<void>(`/api/groups/${idPath(groupId)}/post-test`, { authenticated: true, body: { enabled } }),
 };

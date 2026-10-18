@@ -3,7 +3,6 @@ import { useFonts } from "expo-font";
 import { Fraunces_700Bold } from "@expo-google-fonts/fraunces";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "@/features/auth/auth-context";
-import { QuizStoreProvider } from "@/features/quiz/quiz-store";
 import { colors } from "@/theme/tokens";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -13,10 +12,8 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
   return (
     <AuthProvider>
-      <QuizStoreProvider>
-        <StatusBar style="dark" />
-        <RootNavigator />
-      </QuizStoreProvider>
+      <StatusBar style="dark" />
+      <RootNavigator />
     </AuthProvider>
   );
 }
@@ -57,6 +54,7 @@ function RootNavigator() {
           name="quiz/create"
           options={{ animation: "slide_from_bottom" }}
         />
+        <Stack.Screen name="quiz/edit" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="change-password" options={{ animation: "slide_from_right" }} />
       </Stack.Protected>
     </Stack>

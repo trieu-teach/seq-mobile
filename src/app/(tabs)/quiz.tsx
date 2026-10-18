@@ -1,289 +1,46 @@
-import { Image } from "expo-image";
-import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Screen } from "@/components/screen";
-import { Card, Pill, Progress, SectionTitle } from "@/components/ui";
-import { learnerDirectory, learners, quizLiveProgress } from "@/data/dashboard";
-import { useAuth } from "@/features/auth/auth-context";
-import { useQuizStore } from "@/features/quiz/quiz-store";
-import { colors, radius, shadow, type } from "@/theme/tokens";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, router } from 'expo-router';
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { groupsApi, quizzesApi, type Group, type QuizDetail, type QuizResults, type QuizSummary } from '@/api';
+import { ConfirmDialog, Toast } from '@/components/feedback';
+import { Screen } from '@/components/screen';
+import { Card, Pill, SectionTitle } from '@/components/ui';
+import { useAuth } from '@/features/auth/auth-context';
+import { colors, radius, shadow, type } from '@/theme/tokens';
 
-export default function QuizScreen() {
-  const { isGuest, session } = useAuth();
-  return session?.role === "TEACHER" ? <TeacherQuiz /> : <ParentKnowledge isGuest={isGuest} />;
-}
+const quizErrors: Record<number, string> = { 3004:'Bạn không có quyền thao tác với đề này.',3005:'Gói giáo viên đã hết hạn.',8001:'Không tìm thấy đề.',8002:'Đề đã phát hành hoặc là hậu trắc nên không thể thay đổi.',8008:'Chỉ lớp đang mở mới sử dụng được Quiz.' };
+function messageOf(reason: unknown) { if (reason && typeof reason === 'object' && 'code' in reason) { const value=quizErrors[Number((reason as {code?:unknown}).code)]; if(value)return value; } return reason instanceof Error ? reason.message : 'Không thể hoàn thành yêu cầu.'; }
+function dateLabel(value: string | null) { return value ? new Date(value).toLocaleString('vi-VN') : 'Không có hạn'; }
+function kindLabel(quiz: QuizSummary) { return quiz.kind === 'POST_TEST' ? `Hậu trắc chương ${quiz.chapter}` : 'Đề giáo viên'; }
+
+export default function QuizScreen() { const { session }=useAuth(); return session?.role==='TEACHER'?<TeacherQuiz/>:<Screen title="Kiến thức tài chính" subtitle="Kết quả học tập của trẻ"><Card><Text style={styles.empty}>Kết quả Quiz của trẻ được tổng hợp trong báo cáo từng hồ sơ.</Text></Card></Screen>; }
 
 function TeacherQuiz() {
-  const { quizzes } = useQuizStore();
-  return (
-    <Screen
-      title="Quiz lớp học"
-      subtitle="Tạo đề và theo dõi tiến độ làm bài của từng học sinh"
-    >
-      <View style={styles.teacherHero}>
-        <Image source={require('../../../assets/images/finteen/quiz-teacher-bg-v3.png')} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="center" />
-        <View style={styles.heroShade} />
-        <View style={styles.heroContent}>
-          <Text style={styles.heroEyebrow}>KHÔNG GIAN GIÁO VIÊN</Text>
-          <Text style={styles.heroTitle}>Quiz đang diễn ra</Text>
-          <Text style={styles.heroText}>Lớp 10A2 · Chi tiêu thông minh</Text>
-        <Pressable
-          onPress={() => router.push("/quiz/create")}
-          style={styles.create}
-        >
-          <Text style={styles.createText}>＋ Tạo Quiz</Text>
-        </Pressable></View>
-      </View>
-      <View style={styles.stats}>
-        <Stat value="4" label="Học sinh" />
-        <Stat value="2" label="Đang làm" />
-        <Stat value="1" label="Đã nộp" />
-        <Stat value="1" label="Chưa bắt đầu" />
-      </View>
-      <SectionTitle>Tiến độ trực tiếp</SectionTitle>
-      {quizLiveProgress.map((item) => {
-        const learner = learnerDirectory.find(
-          (value) => value.id === item.learnerId,
-        )!;
-        const status =
-          item.status === "SUBMITTED"
-            ? "ĐÃ NỘP"
-            : item.status === "DOING"
-              ? "ĐANG LÀM"
-              : "CHƯA BẮT ĐẦU";
-        return (
-          <Pressable
-            key={item.learnerId}
-            onPress={() =>
-              router.push({
-                pathname: "/learner/[id]",
-                params: { id: learner.id },
-              } as never)
-            }
-          >
-            <Card style={styles.student}>
-              <View
-                style={[
-                  styles.studentAvatar,
-                  { backgroundColor: learner.color },
-                ]}
-              >
-                <Text style={styles.studentInitial}>{learner.initial}</Text>
-              </View>
-              <View style={styles.studentCopy}>
-                <View style={styles.studentTop}>
-                  <Text style={styles.studentName}>{learner.name}</Text>
-                  <Pill
-                    color={
-                      item.status === "SUBMITTED"
-                        ? colors.greenSoft
-                        : item.status === "DOING"
-                          ? colors.yellowSoft
-                          : "#ECEFED"
-                    }
-                    textColor={
-                      item.status === "SUBMITTED" ? colors.greenDark : "#6E6250"
-                    }
-                  >
-                    {status}
-                  </Pill>
-                </View>
-                <View style={styles.progressRow}>
-                  <View style={styles.progress}>
-                    <Progress
-                      value={(item.current / item.total) * 100}
-                      color={
-                        item.status === "SUBMITTED"
-                          ? colors.green
-                          : colors.purple
-                      }
-                    />
-                  </View>
-                  <Text style={styles.question}>
-                    {item.current}/{item.total} câu
-                  </Text>
-                </View>
-              </View>
-            </Card>
-          </Pressable>
-        );
-      })}
-      <SectionTitle>Quiz của bạn</SectionTitle>
-      {quizzes.map((quiz) => (
-        <Card key={quiz.id} style={styles.quizCard}>
-          <View style={styles.quizIcon}>
-            <Text style={styles.quizIconText}>?</Text>
-          </View>
-          <View style={styles.quizCopy}>
-            <Text style={styles.quizTitle}>{quiz.title}</Text>
-            <Text style={styles.quizMeta}>
-              {quiz.questions.length} câu ·{" "}
-              {quiz.status === "ready" ? "Sẵn sàng" : "Bản nháp"}
-            </Text>
-          </View>
-          <Text style={styles.chevron}>›</Text>
-        </Card>
-      ))}
-    </Screen>
-  );
+  const params=useLocalSearchParams<{saved?:string}>(); const [groups,setGroups]=useState<Group[]>([]); const [groupId,setGroupId]=useState(''); const [quizzes,setQuizzes]=useState<QuizSummary[]>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState(''); const [message,setMessage]=useState(params.saved==='created'?'Đã tạo đề nháp.':params.saved==='updated'?'Đã cập nhật đề nháp.':''); const [confirm,setConfirm]=useState<{quiz:QuizSummary;type:'publish'|'delete'}|null>(null); const [results,setResults]=useState<QuizResults|null>(null); const [detail,setDetail]=useState<QuizDetail|null>(null); const [busy,setBusy]=useState(false);
+  const loadGroups=useCallback(async()=>{try{const rows=(await groupsApi.list()??[]).filter(g=>g.context==='CLASS');setGroups(rows);setGroupId(old=>old||rows.find(g=>!g.closedAt)?.id||rows[0]?.id||'');}catch(reason){setError(messageOf(reason));}},[]);
+  const loadQuizzes=useCallback(async()=>{if(!groupId){setQuizzes([]);setLoading(false);return;}setLoading(true);setError('');try{setQuizzes(await quizzesApi.list(groupId)??[]);}catch(reason){setError(messageOf(reason));}finally{setLoading(false);}},[groupId]);
+  // Initial server synchronization intentionally owns this screen's loading state.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(()=>{void loadGroups();},[loadGroups]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(()=>{void loadQuizzes();},[loadQuizzes]);
+  useFocusEffect(useCallback(()=>{void loadGroups(); if(groupId)void loadQuizzes();},[groupId,loadGroups,loadQuizzes]));
+  const current=groups.find(g=>g.id===groupId); const stats=useMemo(()=>({draft:quizzes.filter(q=>!q.publishedAt).length,published:quizzes.filter(q=>q.publishedAt).length,submitted:quizzes.reduce((sum,q)=>sum+q.submittedCount,0)}),[quizzes]);
+  async function act(){if(!confirm)return;setBusy(true);setError('');try{if(confirm.type==='publish'){await quizzesApi.publish(confirm.quiz.id);setMessage('Đã phát hành đề cho lớp.');}else{await quizzesApi.remove(confirm.quiz.id);setMessage('Đã xóa đề nháp.');}setConfirm(null);await loadQuizzes();}catch(reason){setError(messageOf(reason));setConfirm(null);}finally{setBusy(false);}}
+  async function showResults(quiz:QuizSummary){setBusy(true);setError('');try{setResults(await quizzesApi.results(quiz.id));}catch(reason){setError(messageOf(reason));}finally{setBusy(false);}}
+  async function showDetail(quiz:QuizSummary){setBusy(true);setError('');try{setDetail(await quizzesApi.get(quiz.id));}catch(reason){setError(messageOf(reason));}finally{setBusy(false);}}
+  return <Screen title="Quiz lớp học" subtitle="Tạo đề từ kho chung, phát hành và theo dõi kết quả" action={<Pressable onPress={()=>{void loadGroups();void loadQuizzes();}} style={styles.refresh}><Text style={styles.refreshText}>↻</Text></Pressable>}>
+    {message?<Toast kind="success" message={message} onClose={()=>setMessage('')}/>:null}{error?<Toast kind="error" message={error} onClose={()=>setError('')}/>:null}
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupTabs}>{groups.map(group=><Pressable key={group.id} onPress={()=>setGroupId(group.id)} style={[styles.groupTab,groupId===group.id&&styles.groupTabActive]}><Text style={[styles.groupText,groupId===group.id&&styles.groupTextActive]}>{group.name}</Text></Pressable>)}</ScrollView>
+    <View style={styles.hero}><View><Text style={styles.heroEyebrow}>LỚP ĐANG CHỌN</Text><Text style={styles.heroTitle}>{current?.name||'Chưa có lớp'}</Text><Text style={styles.heroMeta}>{quizzes.length} đề · {stats.submitted} lượt đã nộp</Text></View><Pressable disabled={!current||Boolean(current.closedAt)} onPress={()=>router.push('/quiz/create')} style={[styles.create,(!current||current.closedAt)&&styles.disabled]}><Text style={styles.createText}>＋ Tạo đề</Text></Pressable></View>
+    <View style={styles.stats}><Stat value={String(stats.draft)} label="Bản nháp"/><Stat value={String(stats.published)} label="Đã phát hành"/><Stat value={String(stats.submitted)} label="Lượt đã nộp"/></View>
+    <SectionTitle>Danh sách đề</SectionTitle>{loading?<ActivityIndicator size="large" color={colors.greenDark}/>:quizzes.length?quizzes.map(quiz=><Card key={quiz.id} style={styles.quiz}><View style={styles.quizTop}><View style={styles.quizIcon}><Text style={styles.quizIconText}>?</Text></View><View style={styles.quizCopy}><Pill color={quiz.kind==='POST_TEST'?colors.purpleSoft:quiz.publishedAt?colors.greenSoft:colors.yellowSoft} textColor={quiz.kind==='POST_TEST'?colors.purple:colors.greenDark}>{kindLabel(quiz)}</Pill><Text style={styles.quizTitle}>{quiz.title}</Text><Text style={styles.quizMeta}>{quiz.questionCount} câu · {quiz.publishedAt?`Phát hành ${dateLabel(quiz.publishedAt)}`:`Hạn ${dateLabel(quiz.dueAt)}`}</Text></View></View><View style={styles.actions}><Action label="Xem đề" icon="⌕" onPress={()=>void showDetail(quiz)}/>{!quiz.publishedAt&&quiz.kind!=='POST_TEST'?<Action label="Sửa đề" icon="✎" onPress={()=>router.push({pathname:'/quiz/edit',params:{id:quiz.id}})}/>:null}{quiz.publishedAt?<Action label={`Kết quả · ${quiz.submittedCount}`} icon="▤" primary onPress={()=>void showResults(quiz)}/>:<Action label="Phát hành" icon="➜" primary onPress={()=>setConfirm({quiz,type:'publish'})}/>}</View>{!quiz.publishedAt&&quiz.kind!=='POST_TEST'?<Pressable onPress={()=>setConfirm({quiz,type:'delete'})} style={styles.deleteLink}><Text style={styles.deleteLinkText}>Xóa đề nháp</Text></Pressable>:null}</Card>):<Card><Text style={styles.empty}>Lớp này chưa có Quiz. Tạo đề đầu tiên từ kho câu hỏi chung.</Text></Card>}
+    <DetailModal detail={detail} onClose={()=>setDetail(null)}/><ResultsModal data={results} onClose={()=>setResults(null)}/><ConfirmDialog visible={Boolean(confirm)} title={confirm?.type==='publish'?'Phát hành đề?':'Xóa đề nháp?'} description={confirm?.type==='publish'?'Sau khi phát hành, tên đề, câu hỏi và hạn nộp sẽ bị khóa.':'Đề nháp sẽ bị xóa khỏi lớp.'} confirmLabel={confirm?.type==='publish'?'Phát hành':'Xóa đề'} destructive={confirm?.type==='delete'} busy={busy} onCancel={()=>setConfirm(null)} onConfirm={()=>void act()}/>
+  </Screen>;
 }
-
-function ParentKnowledge({ isGuest }: { isGuest: boolean }) {
-  const learner = learners[0];
-  return (
-    <Screen
-      title="Kiến thức tài chính"
-      subtitle="Kết quả mini-game và quiz của trẻ"
-    >
-      {isGuest ? <Card style={styles.demoLock}><View style={styles.demoLockIcon}><Text style={styles.demoLockIconText}>🔒</Text></View><View style={styles.quizCopy}><Text style={styles.quizTitle}>Demo game dành cho thành viên</Text><Text style={styles.quizMeta}>Bạn vẫn xem được nội dung mẫu bên dưới. Đăng nhập để xem gói và mở quyền chơi.</Text></View><Pressable onPress={() => router.push('/login')} style={styles.unlock}><Text style={styles.unlockText}>Đăng nhập</Text></Pressable></Card> : null}
-      <View style={styles.parentHero}>
-        <Image source={require('../../../assets/images/finteen/quiz-parent-bg-v3.png')} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="center" />
-        <View style={styles.heroShade} />
-        <View style={styles.heroContent}>
-        <Text style={styles.heroEyebrow}>MỨC NẮM KHÁI NIỆM</Text>
-        <Text style={styles.heroTitle}>
-          {learner.mastery.filter((item) => item.value >= 0.95).length}/
-          {learner.mastery.length} khái niệm đã đạt ngưỡng
-        </Text>
-        <Text style={styles.heroText}>
-          Kết quả chỉ lấy từ câu hỏi có đúng–sai, không dùng lựa chọn thiên
-          hướng.
-        </Text>
-        </View>
-      </View>
-      {learner.mastery.map((item) => (
-        <Card key={item.code} style={styles.concept}>
-          <View style={styles.conceptTop}>
-            <View style={styles.quizCopy}>
-              <Text style={styles.quizTitle}>{item.concept}</Text>
-              <Text style={styles.quizMeta}>{item.code}</Text>
-            </View>
-            <Text style={styles.mastery}>{Math.round(item.value * 100)}%</Text>
-          </View>
-          <Progress
-            value={item.value * 100}
-            color={item.value >= 0.95 ? colors.green : colors.yellow}
-          />
-        </Card>
-      ))}
-      <SectionTitle>Kết quả theo chương</SectionTitle>
-      {learner.chapters.map((item) => (
-        <Card key={item.chapter} style={styles.result}>
-          <Image
-            source={item.image}
-            style={styles.resultImage}
-            contentFit="cover"
-          />
-          <View style={styles.quizCopy}>
-            <Text style={styles.quizTitle}>{item.title}</Text>
-            <Text style={styles.quizMeta}>
-              {item.correct}/{item.total} mini-game đúng
-            </Text>
-          </View>
-        </Card>
-      ))}
-    </Screen>
-  );
-}
-
-function Stat({ value, label }: { value: string; label: string }) {
-  return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
-const styles = StyleSheet.create({
-  teacherHero: {
-    minHeight: 220,
-    padding: 20,
-    borderRadius: radius.xl,
-    overflow: "hidden",
-    justifyContent: "flex-end",
-  },
-  parentHero: {
-    minHeight: 220,
-    padding: 20,
-    borderRadius: radius.xl,
-    overflow: "hidden",
-    justifyContent: "flex-end",
-  },
-  heroShade: { position: "absolute", inset: 0, backgroundColor: "rgba(8,40,27,.48)" },
-  heroContent: { width: "68%" },
-  heroEyebrow: { ...type.eyebrow, color: colors.yellow },
-  heroTitle: { ...type.h2, color: colors.white, marginTop: 6 },
-  heroText: { color: "#E4EFE9", fontSize: 11, lineHeight: 17, marginTop: 5 },
-  create: {
-    height: 48,
-    borderRadius: radius.md,
-    backgroundColor: colors.yellow,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 16,
-    ...shadow.button,
-  },
-  createText: { color: colors.ink, fontWeight: "900" },
-  stats: {
-    flexDirection: "row",
-    backgroundColor: colors.ink,
-    borderRadius: radius.xl,
-    paddingVertical: 15,
-  },
-  stat: { flex: 1, alignItems: "center" },
-  statValue: { color: colors.yellow, fontSize: 20, fontWeight: "900" },
-  statLabel: {
-    color: "#B8D4C6",
-    fontSize: 7,
-    textAlign: "center",
-    marginTop: 3,
-  },
-  student: { flexDirection: "row", alignItems: "center", gap: 11, padding: 14 },
-  studentAvatar: {
-    width: 45,
-    height: 45,
-    borderRadius: 15,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  studentInitial: { color: colors.ink, fontWeight: "900" },
-  studentCopy: { flex: 1 },
-  studentTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  studentName: { color: colors.ink, fontSize: 13, fontWeight: "900" },
-  progressRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 9,
-  },
-  progress: { flex: 1 },
-  question: { color: colors.muted, fontSize: 9, fontWeight: "800" },
-  quizCard: { flexDirection: "row", alignItems: "center", gap: 11 },
-  quizIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: colors.purple,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quizIconText: { color: colors.white, fontSize: 20, fontWeight: "900" },
-  quizCopy: { flex: 1 },
-  quizTitle: { color: colors.ink, fontSize: 13, fontWeight: "900" },
-  quizMeta: { color: colors.muted, fontSize: 9, marginTop: 3 },
-  chevron: { color: colors.muted, fontSize: 25 },
-  concept: { gap: 12 },
-  conceptTop: { flexDirection: "row", alignItems: "center" },
-  mastery: { color: colors.greenDark, fontSize: 18, fontWeight: "900" },
-  result: { flexDirection: "row", alignItems: "center", gap: 12, padding: 10 },
-  resultImage: { width: 82, height: 68, borderRadius: radius.md },
-  demoLock: { flexDirection: "row", alignItems: "center", gap: 11, backgroundColor: colors.yellowSoft, borderColor: "#E8D976" },
-  demoLockIcon: { width: 42, height: 42, borderRadius: 14, backgroundColor: colors.white, alignItems: "center", justifyContent: "center" },
-  demoLockIconText: { fontSize: 18 },
-  unlock: { minHeight: 40, paddingHorizontal: 11, borderRadius: radius.md, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
-  unlockText: { color: colors.yellow, fontSize: 9, fontWeight: "900" },
-});
+function Stat({value,label}:{value:string;label:string}){return <View style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></View>;}
+function Action({label,icon,primary=false,onPress}:{label:string;icon:string;primary?:boolean;onPress:()=>void}){return <Pressable onPress={onPress} style={({pressed})=>[styles.action,primary&&styles.actionPrimary,pressed&&styles.actionPressed]}><Text style={[styles.actionIcon,primary&&styles.actionTextPrimary]}>{icon}</Text><Text style={[styles.actionText,primary&&styles.actionTextPrimary]} numberOfLines={1}>{label}</Text></Pressable>;}
+function DetailModal({detail,onClose}:{detail:QuizDetail|null;onClose:()=>void}){return <Modal visible={Boolean(detail)} transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalOverlay}><View style={styles.sheet}><View style={styles.sheetHeader}><View style={styles.quizCopy}><Text style={styles.resultTitle}>{detail?.quiz.title}</Text><Text style={styles.quizMeta}>{detail?`${kindLabel(detail.quiz)} · ${detail.quiz.questionCount} câu`:''}</Text></View><Pressable onPress={onClose} style={styles.closeButton}><Text style={styles.close}>×</Text></Pressable></View><ScrollView contentContainerStyle={styles.sheetContent}>{detail?.questions.map((question,index)=><View key={question.id} style={styles.detailQuestion}><Text style={styles.questionStem}>{index+1}. {question.stem}</Text>{question.options.map((option,i)=><View key={i} style={[styles.detailOption,i===question.correctIndex&&styles.correctOption]}><Text style={[styles.optionLabel,i===question.correctIndex&&styles.correctOptionText]}>{String.fromCharCode(65+i)}</Text><Text style={[styles.optionText,i===question.correctIndex&&styles.correctOptionText]}>{option}</Text>{i===question.correctIndex?<Text style={styles.correctMark}>✓</Text>:null}</View>)}</View>)}</ScrollView></View></View></Modal>;}
+function ResultsModal({data,onClose}:{data:QuizResults|null;onClose:()=>void}){return <Modal visible={Boolean(data)} transparent animationType="slide" onRequestClose={onClose}><View style={styles.modalOverlay}>{data?<View style={styles.sheet}><ScrollView contentContainerStyle={styles.sheetContent}><ResultsPanel data={data} onClose={onClose}/></ScrollView></View>:null}</View></Modal>;}
+function ResultsPanel({data,onClose}:{data:QuizResults;onClose:()=>void}){const total=data.quiz.questionCount;const average=data.summary.averageScore;return <Card style={styles.results}><View style={styles.resultHeader}><View style={styles.quizCopy}><Text style={styles.resultTitle}>Kết quả · {data.quiz.title}</Text><Text style={styles.quizMeta}>{data.summary.submitted}/{data.summary.assigned} học sinh đã nộp</Text></View><Pressable onPress={onClose}><Text style={styles.close}>×</Text></Pressable></View><View style={styles.resultStats}><Stat value={`${data.summary.submitted}/${data.summary.assigned}`} label="Đã hoàn thành"/><Stat value={average==null?'—':`${(average/total*10).toFixed(1)}`} label="Điểm /10"/></View>{data.rows.map(row=><View key={row.slotId} style={styles.row}><View style={styles.avatar}><Text style={styles.avatarText}>{(row.displayName||'?').charAt(0).toUpperCase()}</Text></View><View style={styles.quizCopy}><Text style={styles.rowName}>{row.displayName||'Đã xóa dữ liệu'}</Text><Text style={styles.quizMeta}>{row.code||row.status}</Text></View><Text style={[styles.rowScore,!row.attempted&&styles.pending]}>{row.attempted?`${row.score}/${row.totalQuestions}`:'Chưa nộp'}</Text></View>)}</Card>;}
+const styles=StyleSheet.create({refresh:{width:46,height:46,borderRadius:15,backgroundColor:colors.greenSoft,alignItems:'center',justifyContent:'center'},refreshText:{fontSize:24,color:colors.greenDark,fontWeight:'900'},groupTabs:{gap:8},groupTab:{minHeight:42,paddingHorizontal:15,borderRadius:14,backgroundColor:colors.white,borderWidth:1,borderColor:colors.line,alignItems:'center',justifyContent:'center'},groupTabActive:{backgroundColor:colors.ink,borderColor:colors.ink},groupText:{color:colors.muted,fontSize:11,fontWeight:'800'},groupTextActive:{color:colors.yellow},hero:{minHeight:128,padding:18,borderRadius:radius.xl,backgroundColor:colors.ink,flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12,...shadow.large},heroEyebrow:{...type.eyebrow,color:colors.yellow},heroTitle:{color:colors.white,fontSize:22,fontWeight:'900',marginTop:5},heroMeta:{color:'#B8D4C6',fontSize:10,marginTop:5},create:{minHeight:48,paddingHorizontal:15,borderRadius:radius.md,backgroundColor:colors.yellow,alignItems:'center',justifyContent:'center'},createText:{color:colors.ink,fontSize:11,fontWeight:'900'},disabled:{opacity:.4},stats:{flexDirection:'row',paddingVertical:14,borderRadius:radius.xl,backgroundColor:colors.white,borderWidth:1,borderColor:colors.line},stat:{flex:1,alignItems:'center'},statValue:{color:colors.greenDark,fontSize:19,fontWeight:'900'},statLabel:{color:colors.muted,fontSize:8,fontWeight:'700',marginTop:3,textAlign:'center'},quiz:{gap:15},quizTop:{flexDirection:'row',gap:11,alignItems:'flex-start'},quizIcon:{width:44,height:44,borderRadius:14,backgroundColor:colors.purple,alignItems:'center',justifyContent:'center'},quizIconText:{color:colors.white,fontSize:21,fontWeight:'900'},quizCopy:{flex:1},quizTitle:{color:colors.ink,fontSize:14,fontWeight:'900',lineHeight:20,marginTop:8},quizMeta:{color:colors.muted,fontSize:9,lineHeight:14,marginTop:4},actions:{flexDirection:'row',gap:8},action:{flex:1,minHeight:48,paddingHorizontal:8,borderRadius:14,backgroundColor:'#F4F6F3',borderWidth:1,borderColor:colors.line,flexDirection:'row',alignItems:'center',justifyContent:'center',gap:5},actionPrimary:{backgroundColor:colors.ink,borderColor:colors.ink},actionPressed:{opacity:.7,transform:[{scale:.98}]},actionIcon:{color:colors.greenDark,fontSize:16,fontWeight:'900'},actionText:{color:colors.inkSoft,fontSize:9,fontWeight:'900'},actionTextPrimary:{color:colors.yellow},deleteLink:{alignSelf:'center',paddingVertical:2,paddingHorizontal:10},deleteLinkText:{color:'#B44F35',fontSize:9,fontWeight:'800',textDecorationLine:'underline'},empty:{color:colors.muted,textAlign:'center',lineHeight:19},modalOverlay:{flex:1,justifyContent:'flex-end',backgroundColor:'rgba(10,35,24,.48)'},sheet:{maxHeight:'90%',backgroundColor:colors.canvas,borderTopLeftRadius:radius.xxl,borderTopRightRadius:radius.xxl,overflow:'hidden'},sheetHeader:{padding:18,backgroundColor:colors.white,borderBottomWidth:1,borderBottomColor:colors.line,flexDirection:'row',alignItems:'center'},sheetContent:{padding:18,paddingBottom:36,gap:13},closeButton:{width:40,height:40,borderRadius:13,backgroundColor:colors.canvas,alignItems:'center',justifyContent:'center'},detailQuestion:{padding:15,borderRadius:radius.lg,backgroundColor:colors.white,borderWidth:1,borderColor:colors.line,gap:9,...shadow.card},questionStem:{color:colors.ink,fontSize:13,fontWeight:'900',lineHeight:19},detailOption:{minHeight:43,paddingHorizontal:10,borderRadius:12,backgroundColor:'#F5F7F4',flexDirection:'row',alignItems:'center',gap:9},correctOption:{backgroundColor:colors.greenSoft,borderWidth:1,borderColor:'#BDE5CF'},optionLabel:{width:25,height:25,lineHeight:25,textAlign:'center',borderRadius:8,overflow:'hidden',backgroundColor:colors.white,color:colors.muted,fontSize:10,fontWeight:'900'},optionText:{flex:1,color:colors.inkSoft,fontSize:11,lineHeight:16},correctOptionText:{color:colors.greenDark,fontWeight:'900'},correctMark:{color:colors.greenDark,fontWeight:'900'},results:{gap:13,borderColor:colors.green},resultHeader:{flexDirection:'row',alignItems:'flex-start'},resultTitle:{color:colors.ink,fontSize:16,fontWeight:'900'},close:{color:colors.muted,fontSize:28,lineHeight:28},resultStats:{flexDirection:'row',paddingVertical:12,borderRadius:radius.lg,backgroundColor:colors.greenSoft},row:{minHeight:58,flexDirection:'row',alignItems:'center',gap:10,borderTopWidth:1,borderTopColor:colors.line,paddingTop:10},avatar:{width:38,height:38,borderRadius:12,backgroundColor:colors.yellowSoft,alignItems:'center',justifyContent:'center'},avatarText:{color:colors.ink,fontWeight:'900'},rowName:{color:colors.ink,fontSize:12,fontWeight:'900'},rowScore:{color:colors.greenDark,fontSize:13,fontWeight:'900'},pending:{color:colors.muted,fontSize:9}});

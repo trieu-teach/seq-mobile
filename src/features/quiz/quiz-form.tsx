@@ -1,258 +1,37 @@
-import { useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { createQuestion } from './data';
-import type { QuizDraft, QuizQuestion } from './types';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { router } from 'expo-router';
+import { groupsApi, quizzesApi, type Group, type Question } from '@/api';
+import { Toast } from '@/components/feedback';
 import { colors, radius, shadow, spacing, type } from '@/theme/tokens';
 
-type QuizFormProps = {
-  initialValue?: QuizDraft;
-  onCancel: () => void;
-  onSubmit: (value: QuizDraft) => void;
-};
+const standards = ['', 'CEE-I', 'CEE-II', 'CEE-III', 'CEE-IV', 'CEE-V', 'CEE-VI'];
+const errors: Record<number, string> = { 3004: 'Bạn không có quyền thao tác với lớp này.', 3005: 'Gói giáo viên đã hết hạn. Hãy gia hạn để tạo đề.', 8007: 'Một câu hỏi đã bị rút hoặc không còn dùng được.', 8008: 'Chỉ lớp đang mở mới tạo được Quiz.' };
+function messageOf(reason: unknown) { if (reason && typeof reason === 'object' && 'code' in reason) { const message = errors[Number((reason as { code?: unknown }).code)]; if (message) return message; } return reason instanceof Error ? reason.message : 'Không thể hoàn thành yêu cầu.'; }
+function defaultDueAt() { const date = new Date(Date.now() + 86_400_000); return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16).replace('T', ' '); }
 
-const optionLabels = ['A', 'B', 'C', 'D'];
-
-export function QuizForm({ initialValue, onCancel, onSubmit }: QuizFormProps) {
-  const [title, setTitle] = useState(initialValue?.title ?? '');
-  const [description, setDescription] = useState(initialValue?.description ?? '');
-  const [questions, setQuestions] = useState<QuizQuestion[]>(initialValue?.questions ?? [createQuestion()]);
-
-  const updateQuestion = (questionId: string, patch: Partial<QuizQuestion>) => {
-    setQuestions((current) => current.map((question) => question.id === questionId ? { ...question, ...patch } : question));
-  };
-
-  const updateOption = (questionId: string, optionIndex: number, value: string) => {
-    setQuestions((current) => current.map((question) => {
-      if (question.id !== questionId) return question;
-      const options = [...question.options] as QuizQuestion['options'];
-      options[optionIndex] = value;
-      return { ...question, options };
-    }));
-  };
-
-  const save = () => {
-    const cleanTitle = title.trim();
-    const invalidQuestion = questions.findIndex((question) => !question.text.trim() || question.options.some((option) => !option.trim()));
-    if (!cleanTitle) {
-      Alert.alert('Thiếu tên Quiz', 'Bạn hãy nhập tên bài kiểm tra trước khi lưu.');
-      return;
-    }
-    if (invalidQuestion >= 0) {
-      Alert.alert('Chưa hoàn thành câu hỏi', `Câu ${invalidQuestion + 1} cần có nội dung và đủ 4 lựa chọn.`);
-      return;
-    }
-    onSubmit({
-      title: cleanTitle,
-      description: description.trim(),
-      questions: questions.map((question) => ({
-        ...question,
-        text: question.text.trim(),
-        options: question.options.map((option) => option.trim()) as QuizQuestion['options'],
-      })),
-      status: 'ready',
-    });
-  };
-
-  return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.header}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Quay lại" onPress={onCancel} style={styles.iconButton}>
-            <Text style={styles.backIcon}>‹</Text>
-          </Pressable>
-          <View style={styles.headerCopy}>
-            <Text style={styles.headerEyebrow}>{initialValue ? 'CHỈNH SỬA ĐỀ' : 'QUIZ MỚI'}</Text>
-            <Text numberOfLines={1} style={styles.headerTitle}>{title || 'Quiz chưa đặt tên'}</Text>
-          </View>
-          <View style={styles.countBadge}><Text style={styles.countText}>{questions.length} câu</Text></View>
-        </View>
-
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <View style={styles.intro}>
-            <Image source={require('../../../assets/images/finteen/quiz-create-bg-v3.png')} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="center" />
-            <LinearGradient colors={['rgba(10,43,29,.96)','rgba(10,43,29,.72)','rgba(10,43,29,.1)']} start={{x:0,y:0}} end={{x:1,y:0}} style={StyleSheet.absoluteFill}/>
-            <View style={styles.introCopy}>
-              <Text style={styles.introTitle}>Tạo một bài kiểm tra thật dễ hiểu</Text>
-              <Text style={styles.introText}>Mỗi câu gồm 4 lựa chọn. Chạm vào vòng tròn để đánh dấu đáp án đúng.</Text>
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.label}>Tên bài kiểm tra <Text style={styles.required}>*</Text></Text>
-            <TextInput
-              maxLength={120}
-              onChangeText={setTitle}
-              placeholder="Ví dụ: Chi tiêu thông minh"
-              placeholderTextColor="#98A49E"
-              style={styles.input}
-              value={title}
-            />
-            <Text style={styles.label}>Mô tả ngắn</Text>
-            <TextInput
-              maxLength={240}
-              multiline
-              onChangeText={setDescription}
-              placeholder="Quiz này giúp học sinh ôn lại nội dung gì?"
-              placeholderTextColor="#98A49E"
-              style={[styles.input, styles.descriptionInput]}
-              textAlignVertical="top"
-              value={description}
-            />
-          </View>
-
-          <View style={styles.questionHeading}>
-            <View>
-              <Text style={styles.questionHeadingTitle}>Câu hỏi</Text>
-              <Text style={styles.questionHeadingSub}>Chọn duy nhất một đáp án đúng</Text>
-            </View>
-            <Text style={styles.questionTotal}>{questions.length}</Text>
-          </View>
-
-          {questions.map((question, questionIndex) => (
-            <View key={question.id} style={styles.questionCard}>
-              <View style={styles.questionTop}>
-                <View style={styles.questionNumber}><Text style={styles.questionNumberText}>{questionIndex + 1}</Text></View>
-                <Text style={styles.questionTitle}>Câu {questionIndex + 1}</Text>
-                {questions.length > 1 && (
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => setQuestions((current) => current.filter((item) => item.id !== question.id))}
-                    hitSlop={8}
-                  >
-                    <Text style={styles.removeText}>Xóa</Text>
-                  </Pressable>
-                )}
-              </View>
-              <TextInput
-                multiline
-                onChangeText={(value) => updateQuestion(question.id, { text: value })}
-                placeholder="Nhập nội dung câu hỏi..."
-                placeholderTextColor="#98A49E"
-                style={[styles.input, styles.questionInput]}
-                textAlignVertical="top"
-                value={question.text}
-              />
-              <Text style={styles.answerHint}>CÁC LỰA CHỌN</Text>
-              {question.options.map((option, optionIndex) => {
-                const selected = question.correctOption === optionIndex;
-                return (
-                  <View key={`${question.id}-${optionIndex}`} style={[styles.optionRow, selected && styles.optionRowSelected]}>
-                    <Pressable
-                      accessibilityRole="radio"
-                      accessibilityState={{ selected }}
-                      onPress={() => updateQuestion(question.id, { correctOption: optionIndex })}
-                      style={[styles.radio, selected && styles.radioSelected]}
-                    >
-                      {selected && <View style={styles.radioDot} />}
-                    </Pressable>
-                    <View style={[styles.optionLetter, selected && styles.optionLetterSelected]}>
-                      <Text style={[styles.optionLetterText, selected && styles.optionLetterTextSelected]}>{optionLabels[optionIndex]}</Text>
-                    </View>
-                    <TextInput
-                      onChangeText={(value) => updateOption(question.id, optionIndex, value)}
-                      placeholder={`Lựa chọn ${optionLabels[optionIndex]}`}
-                      placeholderTextColor="#98A49E"
-                      style={styles.optionInput}
-                      value={option}
-                    />
-                    {selected && <Text style={styles.correctText}>Đúng</Text>}
-                  </View>
-                );
-              })}
-            </View>
-          ))}
-
-          <Pressable accessibilityRole="button" onPress={() => setQuestions((current) => [...current, createQuestion()])} style={styles.addButton}>
-            <View style={styles.addIcon}><Text style={styles.addIconText}>＋</Text></View>
-            <View style={styles.addCopy}>
-              <Text style={styles.addTitle}>Thêm câu hỏi</Text>
-              <Text style={styles.addSub}>Tạo thêm một câu với 4 lựa chọn</Text>
-            </View>
-            <Text style={styles.addArrow}>›</Text>
-          </Pressable>
-        </ScrollView>
-
-        <View style={styles.footer}>
-          <Pressable accessibilityRole="button" onPress={onCancel} style={styles.cancelButton}><Text style={styles.cancelText}>Hủy</Text></Pressable>
-          <Pressable accessibilityRole="button" onPress={save} style={styles.saveButton}>
-            <Text style={styles.saveText}>Lưu & xem trước</Text><Text style={styles.saveArrow}>→</Text>
-          </Pressable>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  );
+export function QuizForm({ quizId }: { quizId?: string }) {
+  const [groups, setGroups] = useState<Group[]>([]); const [groupId, setGroupId] = useState('');
+  const [title, setTitle] = useState(''); const [dueAt, setDueAt] = useState(defaultDueAt);
+  const [questions, setQuestions] = useState<Question[]>([]); const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState(''); const [standard, setStandard] = useState('');
+  const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [error, setError] = useState('');
+  const initialized = useRef(false);
+  const load = useCallback(async () => { setLoading(true); setError(''); try { const [groupRows, questionRows, detail] = await Promise.all([groupsApi.list(), quizzesApi.questions({ q: query, standard }), quizId&&!initialized.current?quizzesApi.get(quizId):Promise.resolve(null)]); const open = (groupRows ?? []).filter((item) => item.context === 'CLASS' && !item.closedAt); setGroups(open); setQuestions(questionRows ?? []); if(detail){setGroupId(detail.quiz.groupId);setTitle(detail.quiz.title);if(detail.quiz.dueAt){const date=new Date(detail.quiz.dueAt);setDueAt(new Date(date.getTime()-date.getTimezoneOffset()*60_000).toISOString().slice(0,16).replace('T',' '));}setSelected(new Set(detail.questions.map(item=>item.id)));initialized.current=true;}else setGroupId((current) => current || open[0]?.id || ''); } catch (reason) { setError(messageOf(reason)); } finally { setLoading(false); } }, [query, standard, quizId]);
+  // Initial server synchronization intentionally owns this form's loading state.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void load(); }, [load]);
+  function toggle(id: string) { setSelected((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else if (next.size < 100) next.add(id); return next; }); }
+  async function submit() { setError(''); const deadline = new Date(dueAt.trim().replace(' ', 'T')); if (!groupId) return setError('Bạn chưa có lớp đang mở để tạo Quiz.'); if (!title.trim()) return setError('Hãy nhập tên bài kiểm tra.'); if (!selected.size) return setError('Hãy chọn ít nhất một câu hỏi.'); if (Number.isNaN(deadline.getTime()) || deadline <= new Date()) return setError('Hạn nộp phải đúng định dạng và nằm trong tương lai.'); setSaving(true); try { const input={ title, questionIds:[...selected], dueAt:deadline.toISOString() }; if(quizId)await quizzesApi.update(quizId,input);else await quizzesApi.create({groupId,...input}); router.replace({ pathname: '/(tabs)/quiz', params: { saved: quizId?'updated':'created' } }); } catch (reason) { setError(messageOf(reason)); } finally { setSaving(false); } }
+  return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.flex}>
+    <View style={styles.header}><Pressable onPress={() => router.back()} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.headerCopy}><Text style={styles.eyebrow}>{quizId?'CHỈNH SỬA ĐỀ':'QUIZ MỚI'}</Text><Text style={styles.headerTitle}>{quizId?'Cập nhật đề nháp':'Tạo đề từ kho câu hỏi'}</Text></View><View style={styles.count}><Text style={styles.countText}>{selected.size}/100</Text></View></View>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+      {error ? <Toast kind="error" message={error} onClose={() => setError('')} /> : null}
+      <View style={styles.card}><Text style={styles.sectionTitle}>Thông tin đề</Text><Text style={styles.label}>Lớp học</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>{groups.map((group) => <Pressable key={group.id} onPress={() => setGroupId(group.id)} style={[styles.chip, groupId === group.id && styles.chipActive]}><Text style={[styles.chipText, groupId === group.id && styles.chipTextActive]}>{group.name}</Text></Pressable>)}</ScrollView><Text style={styles.label}>Tên bài kiểm tra</Text><TextInput maxLength={120} value={title} onChangeText={setTitle} placeholder="Ví dụ: Ôn tập chi tiêu thông minh" placeholderTextColor="#98A49E" style={styles.input}/><Text style={styles.label}>Hạn nộp</Text><TextInput value={dueAt} onChangeText={setDueAt} autoCapitalize="none" placeholder="YYYY-MM-DD HH:mm" placeholderTextColor="#98A49E" style={styles.input}/><Text style={styles.hint}>Theo giờ trên thiết bị, ví dụ 2026-10-20 20:30.</Text></View>
+      <View style={styles.search}><Text style={styles.sectionTitle}>Chọn câu hỏi</Text><TextInput value={query} onChangeText={setQuery} placeholder="Tìm trong nội dung câu hỏi…" placeholderTextColor="#98A49E" style={styles.input}/><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>{standards.map((item) => <Pressable key={item || 'all'} onPress={() => setStandard(item)} style={[styles.chip, standard === item && styles.chipActive]}><Text style={[styles.chipText, standard === item && styles.chipTextActive]}>{item || 'Tất cả'}</Text></Pressable>)}</ScrollView></View>
+      {loading ? <ActivityIndicator color={colors.greenDark} size="large"/> : questions.length ? questions.map((question, index) => { const active = selected.has(question.id); return <Pressable key={question.id} onPress={() => toggle(question.id)} style={[styles.question, active && styles.questionActive]}><View style={[styles.check, active && styles.checkActive]}><Text style={styles.checkText}>{active ? '✓' : index + 1}</Text></View><View style={styles.questionCopy}><Text style={styles.questionText}>{question.stem}</Text><Text style={styles.meta}>{question.standard || question.pool || 'Kho chung'} · {question.options.length} lựa chọn</Text>{active ? <View style={styles.options}>{question.options.map((option, i) => <Text key={i} style={styles.option}>{String.fromCharCode(65 + i)}. {option}</Text>)}</View> : null}</View></Pressable>; }) : <Text style={styles.empty}>Không tìm thấy câu hỏi phù hợp.</Text>}
+    </ScrollView>
+    <View style={styles.footer}><Pressable disabled={saving} onPress={() => router.back()} style={styles.cancel}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable disabled={saving} onPress={() => void submit()} style={[styles.save, saving && styles.disabled]}><Text style={styles.saveText}>{saving?'Đang lưu…':quizId?'Lưu thay đổi':'Tạo bản nháp'}</Text></Pressable></View>
+  </KeyboardAvoidingView>;
 }
-
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.canvas },
-  flex: { flex: 1 },
-  header: { minHeight: 70, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.white, borderBottomWidth: 1, borderBottomColor: colors.line },
-  iconButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.canvas, alignItems: 'center', justifyContent: 'center' },
-  backIcon: { color: colors.ink, fontSize: 31, lineHeight: 32, marginTop: -2 },
-  headerCopy: { flex: 1 },
-  headerEyebrow: { ...type.eyebrow, color: colors.purple, fontSize: 9 },
-  headerTitle: { color: colors.ink, fontSize: 15, fontWeight: '900', marginTop: 2 },
-  countBadge: { paddingHorizontal: 10, paddingVertical: 7, backgroundColor: colors.purpleSoft, borderRadius: radius.round },
-  countText: { color: colors.purple, fontSize: 11, fontWeight: '900' },
-  content: { padding: spacing.lg, paddingBottom: 36, gap: spacing.lg },
-  intro: { minHeight: 190, justifyContent: 'flex-end', padding: 16, borderRadius: radius.xl, overflow: 'hidden' },
-  introIcon: { width: 40, height: 40, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.purple },
-  introEmoji: { color: colors.white, fontSize: 21 },
-  introCopy: { width: '64%' },
-  introTitle: { color: colors.white, fontSize: 16, fontWeight: '900' },
-  introText: { color: '#E4EFE9', fontSize: 11, lineHeight: 17, marginTop: 4 },
-  section: { gap: 9 },
-  label: { color: colors.inkSoft, fontSize: 13, fontWeight: '800', marginTop: 3 },
-  required: { color: colors.coral },
-  input: { minHeight: 54, paddingHorizontal: 15, paddingVertical: 13, borderWidth: 1.5, borderColor: colors.line, borderRadius: radius.md, backgroundColor: colors.white, color: colors.ink, fontSize: 14, fontWeight: '600' },
-  descriptionInput: { minHeight: 90 },
-  questionHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  questionHeadingTitle: { ...type.h2, color: colors.ink },
-  questionHeadingSub: { color: colors.muted, fontSize: 11, marginTop: 2 },
-  questionTotal: { width: 32, height: 32, lineHeight: 32, textAlign: 'center', borderRadius: 16, overflow: 'hidden', backgroundColor: colors.ink, color: colors.white, fontWeight: '900' },
-  questionCard: { padding: 17, gap: 12, backgroundColor: colors.white, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.line, ...shadow.card },
-  questionTop: { flexDirection: 'row', alignItems: 'center', gap: 9 },
-  questionNumber: { width: 31, height: 31, borderRadius: 11, backgroundColor: colors.yellow, alignItems: 'center', justifyContent: 'center' },
-  questionNumberText: { color: colors.ink, fontWeight: '900' },
-  questionTitle: { flex: 1, color: colors.ink, fontSize: 15, fontWeight: '900' },
-  removeText: { color: '#B6543C', fontSize: 12, fontWeight: '800' },
-  questionInput: { minHeight: 82 },
-  answerHint: { ...type.eyebrow, color: colors.muted, fontSize: 9, marginTop: 2 },
-  optionRow: { minHeight: 54, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: radius.md, borderWidth: 1.5, borderColor: colors.line, backgroundColor: '#FCFDFB' },
-  optionRowSelected: { borderColor: colors.green, backgroundColor: '#F0FAF4' },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#B8C2BD', alignItems: 'center', justifyContent: 'center' },
-  radioSelected: { borderColor: colors.green },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.green },
-  optionLetter: { width: 28, height: 28, borderRadius: 9, backgroundColor: '#EEF1EF', alignItems: 'center', justifyContent: 'center' },
-  optionLetterSelected: { backgroundColor: colors.green },
-  optionLetterText: { color: colors.muted, fontSize: 12, fontWeight: '900' },
-  optionLetterTextSelected: { color: colors.white },
-  optionInput: { flex: 1, minWidth: 0, height: 48, color: colors.ink, fontSize: 13, fontWeight: '600' },
-  correctText: { color: colors.greenDark, fontSize: 10, fontWeight: '900' },
-  addButton: { minHeight: 76, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: '#B7A1E8', borderRadius: radius.xl, backgroundColor: '#FAF8FF' },
-  addIcon: { width: 40, height: 40, borderRadius: 14, backgroundColor: colors.purpleSoft, alignItems: 'center', justifyContent: 'center' },
-  addIconText: { color: colors.purple, fontSize: 24, fontWeight: '500' },
-  addCopy: { flex: 1 },
-  addTitle: { color: colors.purple, fontSize: 14, fontWeight: '900' },
-  addSub: { color: colors.muted, fontSize: 10, marginTop: 3 },
-  addArrow: { color: colors.purple, fontSize: 27 },
-  footer: { paddingHorizontal: spacing.lg, paddingTop: 12, paddingBottom: 8, gap: 10, flexDirection: 'row', borderTopWidth: 1, borderTopColor: colors.line, backgroundColor: colors.white },
-  cancelButton: { minHeight: 52, paddingHorizontal: 20, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.canvas },
-  cancelText: { color: colors.inkSoft, fontWeight: '900' },
-  saveButton: { flex: 1, minHeight: 52, paddingHorizontal: 18, borderRadius: radius.md, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.yellow, ...shadow.button },
-  saveText: { color: colors.ink, fontSize: 14, fontWeight: '900' },
-  saveArrow: { color: colors.ink, fontSize: 20 },
-});
+const styles = StyleSheet.create({ flex:{flex:1,backgroundColor:colors.canvas},header:{paddingTop:Platform.OS==='android'?20:52,minHeight:104,paddingHorizontal:spacing.lg,paddingBottom:12,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:colors.white,borderBottomWidth:1,borderBottomColor:colors.line},back:{width:42,height:42,borderRadius:14,backgroundColor:colors.canvas,alignItems:'center',justifyContent:'center'},backText:{fontSize:30,color:colors.ink,lineHeight:32},headerCopy:{flex:1},eyebrow:{...type.eyebrow,color:colors.purple},headerTitle:{color:colors.ink,fontSize:17,fontWeight:'900',marginTop:3},count:{paddingHorizontal:10,paddingVertical:7,borderRadius:radius.round,backgroundColor:colors.purpleSoft},countText:{color:colors.purple,fontWeight:'900'},content:{padding:spacing.lg,paddingBottom:30,gap:14},card:{padding:16,gap:9,borderRadius:radius.xl,backgroundColor:colors.white,borderWidth:1,borderColor:colors.line,...shadow.card},sectionTitle:{...type.h2,color:colors.ink,marginBottom:3},label:{color:colors.inkSoft,fontSize:12,fontWeight:'800',marginTop:5},input:{minHeight:52,paddingHorizontal:14,borderRadius:radius.md,borderWidth:1.5,borderColor:colors.line,backgroundColor:colors.white,color:colors.ink,fontSize:13},hint:{color:colors.muted,fontSize:10,lineHeight:15},chips:{gap:8,paddingVertical:2},chip:{minHeight:39,paddingHorizontal:13,borderRadius:13,borderWidth:1,borderColor:colors.line,backgroundColor:colors.white,alignItems:'center',justifyContent:'center'},chipActive:{backgroundColor:colors.ink,borderColor:colors.ink},chipText:{color:colors.muted,fontSize:11,fontWeight:'800'},chipTextActive:{color:colors.yellow},search:{gap:9},question:{padding:14,borderRadius:radius.lg,backgroundColor:colors.white,borderWidth:1.5,borderColor:colors.line,flexDirection:'row',alignItems:'flex-start',gap:11,...shadow.card},questionActive:{borderColor:colors.green,backgroundColor:'#F4FBF6'},check:{width:34,height:34,borderRadius:11,backgroundColor:colors.canvas,alignItems:'center',justifyContent:'center'},checkActive:{backgroundColor:colors.green},checkText:{color:colors.ink,fontSize:11,fontWeight:'900'},questionCopy:{flex:1},questionText:{color:colors.ink,fontSize:13,fontWeight:'800',lineHeight:19},meta:{color:colors.muted,fontSize:9,marginTop:5},options:{gap:5,marginTop:10},option:{color:colors.inkSoft,fontSize:11,lineHeight:16},empty:{color:colors.muted,textAlign:'center',padding:24},footer:{paddingHorizontal:spacing.lg,paddingVertical:12,paddingBottom:Platform.OS==='ios'?28:12,flexDirection:'row',gap:10,backgroundColor:colors.white,borderTopWidth:1,borderTopColor:colors.line},cancel:{minHeight:52,paddingHorizontal:22,borderRadius:radius.md,backgroundColor:colors.canvas,alignItems:'center',justifyContent:'center'},cancelText:{color:colors.inkSoft,fontWeight:'900'},save:{flex:1,minHeight:52,borderRadius:radius.md,backgroundColor:colors.yellow,alignItems:'center',justifyContent:'center',...shadow.button},saveText:{color:colors.ink,fontWeight:'900'},disabled:{opacity:.55} });
