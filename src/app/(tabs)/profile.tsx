@@ -8,25 +8,26 @@ import { useAuth } from "@/features/auth/auth-context";
 import { colors, radius, type } from "@/theme/tokens";
 
 const commonRows = [
-  ["👤", "Thông tin tài khoản", "Tên, email và vai trò"],
-  ["🔔", "Thông báo", "Tổng kết và thành tích mới"],
-  ["🔒", "Quyền riêng tư", "Cách FinTeen sử dụng dữ liệu"],
+  ["🔒", "Đổi mật khẩu", "Cập nhật mật khẩu đăng nhập"],
+  ["📊", "Tổng kết và báo cáo", "Tiến độ, Quiz và hoạt động gần đây"],
 ] as const;
 
 export default function ProfileScreen() {
-  const { isGuest, session, setRole, signOut } = useAuth();
+  const { session, setRole, signOut } = useAuth();
   const { entitlement, group } = useWorkspaceData();
   const teacher = session?.role === "TEACHER";
   const contextRow = teacher
     ? (["🏫", "Lớp đang quản lý", group?.name ?? "Chưa có lớp"] as const)
     : (["👨‍👩‍👧", "Gia đình", group?.name ?? "Chưa có nhóm"] as const);
-  const rows = [commonRows[0], contextRow, ...commonRows.slice(1)];
+  const rows = [contextRow, ...commonRows];
 
   function openMenuItem(title: string) {
-    if (title === "Thông tin tài khoản") {
+    if (title === "Đổi mật khẩu") {
       router.push("/change-password" as never);
-    } else if (title === "Các gói dịch vụ") {
-      router.push("/subscribe" as never);
+    } else if (title === "Lớp đang quản lý" || title === "Gia đình") {
+      router.push("/(tabs)/journey" as never);
+    } else if (title === "Tổng kết và báo cáo") {
+      router.push("/(tabs)/rewards" as never);
     }
   }
 
@@ -34,8 +35,6 @@ export default function ProfileScreen() {
     await signOut();
     router.replace("/login");
   }
-
-  if (isGuest) return <Screen title="Tài khoản"><View style={styles.guestHero}><View style={styles.avatar}><Text style={styles.avatarText}>K</Text></View><Text style={styles.guestTitle}>Khách FinTeen</Text><Text style={styles.guestText}>Bạn đang xem giao diện bằng dữ liệu mẫu. Demo game và các thao tác thay đổi dữ liệu được khóa.</Text></View><Card><Text style={styles.contextLabel}>MỞ ĐẦY ĐỦ QUYỀN LỢI</Text><Text style={styles.contextName}>Đăng nhập để xem gói, lưu tiến độ và quản lý hồ sơ</Text><Pressable onPress={() => router.push('/login')} style={styles.guestPrimary}><Text style={styles.guestPrimaryText}>Đăng nhập</Text></Pressable><Pressable onPress={() => router.push('/register' as never)} style={styles.guestLogin}><Text style={styles.guestLoginText}>Chưa có tài khoản? Đăng ký</Text></Pressable></Card><Pressable onPress={logout} style={styles.logout}><Text style={styles.logoutText}>Thoát chế độ khách</Text></Pressable></Screen>;
 
   return (
     <Screen title="Tài khoản">
@@ -188,11 +187,4 @@ const styles = StyleSheet.create({
   },
   logoutText: { color: "#B44F35", fontWeight: "900" },
   version: { textAlign: "center", color: colors.muted, fontSize: 10 },
-  guestHero: { minHeight: 235, borderRadius: radius.xl, padding: 22, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
-  guestTitle: { color: colors.white, fontSize: 22, fontWeight: "900", marginTop: 13 },
-  guestText: { color: "#C6D9CF", fontSize: 11, lineHeight: 17, textAlign: "center", marginTop: 7, maxWidth: 285 },
-  guestPrimary: { height: 52, borderRadius: radius.md, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center", marginTop: 18 },
-  guestPrimaryText: { color: colors.yellow, fontSize: 13, fontWeight: "900" },
-  guestLogin: { height: 46, alignItems: "center", justifyContent: "center" },
-  guestLoginText: { color: colors.greenDark, fontSize: 12, fontWeight: "900" },
 });

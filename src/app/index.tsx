@@ -16,7 +16,7 @@ export default function WelcomeScreen() {
       <View style={styles.heroCopy}><Text style={styles.eyebrow}>FINTEEN CHO NGƯỜI LỚN</Text><Text style={styles.title}>Đồng hành cùng trẻ,{`\n`}không tạo áp lực.</Text><Text style={styles.subtitle}>Theo dõi hành trình tài chính của gia đình hoặc lớp học trong một không gian rõ ràng và riêng tư.</Text></View>
     </View>
     <View style={styles.features}><Feature mark="01" title="Dễ theo dõi" text="Tên, mã và trạng thái ở đúng nơi bạn cần."/><Feature mark="02" title="Đúng ngữ cảnh" text="Chuyển nhanh giữa gia đình và lớp học."/></View>
-    <View style={styles.actions}><Pressable onPress={()=>router.replace(session?(session.account.plans.length?'/(tabs)':'/guest'):'/login')} style={({pressed})=>[styles.primary,pressed&&styles.pressed]}><Text style={styles.primaryText}>{session?(session.account.plans.length?'Mở tổng quan':'Mở trang khách'):'Đăng nhập'}</Text><Text style={styles.arrow}>→</Text></Pressable></View>
+    <View style={styles.actions}><Pressable onPress={()=>router.replace(session?(session.account.plans.length?'/(tabs)':'/guest'):'/login')} style={({pressed})=>[styles.primary,pressed&&styles.pressed]}><Text style={styles.primaryText}>{session?(session.account.plans.length?'Mở tổng quan':'Mở trang chọn gói'):'Đăng nhập'}</Text><Text style={styles.arrow}>→</Text></Pressable></View>
   </SafeAreaView>;
 }
 function Feature({mark,title,text}:{mark:string;title:string;text:string}){return <View style={styles.feature}><Text style={styles.featureMark}>{mark}</Text><View style={styles.featureCopy}><Text style={styles.featureTitle}>{title}</Text><Text style={styles.featureText}>{text}</Text></View></View>;}

@@ -51,7 +51,7 @@ export default function SubscribeScreen() {
   return <Screen title="Gói đăng ký" subtitle="Chọn không gian phù hợp cho gia đình hoặc lớp học" action={<Pressable accessibilityLabel="Đóng" onPress={() => router.canGoBack() ? router.back() : router.replace('/')} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>}>
     {error ? <NoticeBanner kind="error" message={error} onClose={() => setError('')} /> : null}
     {session ? <Card style={styles.currentPlan}>
-      <View style={styles.currentTop}><View><Text style={styles.currentEyebrow}>GÓI ĐANG CÓ</Text><Text style={styles.currentTitle}>{session.account.plans.length ? session.account.plans.map(planName).join(' + ') : 'Chưa có gói học tập'}</Text></View><Pill color={session.account.plans.length ? colors.greenSoft : colors.yellowSoft}>{session.account.plans.length ? 'ĐANG HOẠT ĐỘNG' : 'TÀI KHOẢN KHÁCH'}</Pill></View>
+      <View style={styles.currentTop}><View><Text style={styles.currentEyebrow}>GÓI ĐANG CÓ</Text><Text style={styles.currentTitle}>{session.account.plans.length ? session.account.plans.map(planName).join(' + ') : 'Chưa có gói học tập'}</Text></View><Pill color={session.account.plans.length ? colors.greenSoft : colors.yellowSoft}>{session.account.plans.length ? 'ĐANG HOẠT ĐỘNG' : 'CHƯA CÓ GÓI'}</Pill></View>
       {entitlements.length ? <View style={styles.validities}>{entitlements.map((item) => <View key={item.id} style={styles.validity}><Text style={styles.validityName}>{planName(item.kind)}</Text><Text style={styles.validityDate}>Sử dụng đến {formatDate(item.expiresOn)}</Text></View>)}</View> : <Text style={styles.currentText}>Chọn một gói bên dưới để mở hồ sơ trẻ, tiến độ và nội dung học tập.</Text>}
     </Card> : null}
     {payment ? <Card style={styles.payment}>
@@ -73,7 +73,7 @@ export default function SubscribeScreen() {
       <View style={styles.benefits}><Text style={styles.benefit}>✓ Theo dõi hành trình và tiến bộ</Text><Text style={styles.benefit}>✓ Báo cáo, quiz và thành tựu đầy đủ</Text><Text style={styles.benefit}>✓ Mở quyền sử dụng game cho hồ sơ trẻ</Text></View>
       <Pressable disabled={busy !== null} onPress={() => buy(plan)} style={({ pressed }) => [styles.buy, pressed && styles.pressed, busy && styles.disabled]}>{busy === plan.kind ? <ActivityIndicator color={colors.yellow} /> : <View style={styles.buyCopy}><Text style={styles.buyText}>{session ? (owned ? `Gia hạn ${planName(plan.kind)}` : `Mua ${planName(plan.kind)}`) : 'Đăng nhập để mua'}</Text>{session ? <Text style={styles.buyDuration}>Thêm {plan.months} tháng sử dụng</Text> : null}</View>}</Pressable>
     </Card>}) : <Card><Text style={styles.emptyTitle}>Chưa có gói đang mở bán</Text><Text style={styles.note}>Bảng giá sẽ xuất hiện tại đây khi quản trị viên bật gói.</Text></Card>}
-    {!session ? <Text style={styles.note}>Khách vẫn xem được toàn bộ trang giới thiệu và nội dung mẫu. Chỉ tài khoản có gói mới được chơi game.</Text> : null}
+    {!session ? <Text style={styles.note}>Bạn cần đăng nhập và có gói Parent hoặc Teacher để sử dụng ứng dụng mobile.</Text> : null}
   </Screen>;
 }
 

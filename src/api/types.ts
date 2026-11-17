@@ -50,6 +50,9 @@ export type QuizResults = {
   summary: { assigned: number; submitted: number; averageScore: number | null };
   rows: QuizResultRow[];
 };
+export type QuizSlotResult = {
+  answers: { questionId: string; stem: string; correct: boolean }[];
+};
 
 export type LearnerIndicators = {
   wealth: number;

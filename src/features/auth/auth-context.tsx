@@ -6,8 +6,8 @@ import { setApiAccessToken } from '@/api/client';
 
 const SESSION_KEY = 'finteen.account.session.v1';
 const MOBILE_ROLE_ERROR_MESSAGE =
-  'Ứng dụng này chỉ dành cho khách, phụ huynh và giáo viên. Vui lòng sử dụng đúng cổng đăng nhập.';
-const ALLOWED_MOBILE_ROLES = new Set(['GUEST', 'PARENT', 'TEACHER', 'ACCOUNT', 'USER']);
+  'Ứng dụng mobile này chỉ dành cho phụ huynh và giáo viên. Vui lòng sử dụng đúng tài khoản.';
+const ALLOWED_MOBILE_ROLES = new Set(['PARENT', 'TEACHER', 'ACCOUNT', 'USER']);
 
 class UnsupportedMobileRoleError extends Error {
   constructor() {
@@ -28,7 +28,7 @@ export type Session = {
   expiresAt: number;
 };
 type Result = { ok: true; hasPlan?: boolean } | { ok: false; message: string };
-type AuthContextValue = { isGuest: boolean; isLoading: boolean; session: Session | null; continueAsGuest: () => void; refreshAccount: () => Promise<Result>; register: (email: string, password: string, displayName: string, phone?: string) => Promise<Result>; verifyRegistration: (email: string, otp: string) => Promise<Result>; resendVerification: (email: string) => Promise<Result>; setRole: (role: AccountRole) => Promise<Result>; signIn: (email: string, password: string) => Promise<Result>; changePassword: (oldPassword: string, newPassword: string) => Promise<Result>; signOut: () => Promise<void> };
+type AuthContextValue = { isLoading: boolean; session: Session | null; refreshAccount: () => Promise<Result>; register: (email: string, password: string, displayName: string, phone?: string) => Promise<Result>; verifyRegistration: (email: string, otp: string) => Promise<Result>; resendVerification: (email: string) => Promise<Result>; setRole: (role: AccountRole) => Promise<Result>; signIn: (email: string, password: string) => Promise<Result>; changePassword: (oldPassword: string, newPassword: string) => Promise<Result>; signOut: () => Promise<void> };
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function messageOf(error: unknown) { return error instanceof ApiError || error instanceof Error ? error.message : 'Đã có lỗi xảy ra. Vui lòng thử lại.'; }
@@ -68,7 +68,6 @@ async function storeSession(session: Session | null) {
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [session, setSession] = useState<Session | null>(null);
-  const [isGuest, setIsGuest] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   async function establishSession(token: TokenResult) {
     if (!token.accessToken || !(token.expiresIn > 0)) throw new ApiError('Máy chủ chưa trả phiên đăng nhập hợp lệ.');
@@ -110,8 +109,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     })().finally(() => setIsLoading(false));
   }, []);
   const value = useMemo<AuthContextValue>(() => ({
-    isGuest, isLoading, session,
-    continueAsGuest() { setIsGuest(true); },
+    isLoading, session,
     async refreshAccount() {
       try {
         if (!session) throw new ApiError('Vui lòng đăng nhập lại.');
@@ -130,7 +128,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       }
     },
     async register(email, password, displayName, phone) { try { await authApi.register(email, password, displayName, phone); return { ok: true }; } catch (error) { return { ok: false, message: messageOf(error) }; } },
-    async verifyRegistration(email, otp) { try { const next = await establishSession(await authApi.verify(email, otp)); setIsGuest(false); return { ok: true, hasPlan: next.account.plans.length > 0 }; } catch (error) { return { ok: false, message: messageOf(error) }; } },
+    async verifyRegistration(email, otp) { try { const next = await establishSession(await authApi.verify(email, otp)); return { ok: true, hasPlan: next.account.plans.length > 0 }; } catch (error) { return { ok: false, message: messageOf(error) }; } },
     async resendVerification(email) { try { await authApi.resendVerification(email); return { ok: true }; } catch (error) { return { ok: false, message: messageOf(error) }; } },
     async setRole(role) {
       if (!session?.account.plans.includes(role)) return { ok: false, message: 'Tài khoản chưa có gói cho vai trò này.' };
@@ -138,10 +136,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setSession(next); await storeSession(next);
       return { ok: true };
     },
-    async signIn(email, password) { try { const next = await establishSession(await authApi.login(email, password)); setIsGuest(false); return { ok: true, hasPlan: next.account.plans.length > 0 }; } catch (error) { return { ok: false, message: messageOf(error) }; } },
+    async signIn(email, password) { try { const next = await establishSession(await authApi.login(email, password)); return { ok: true, hasPlan: next.account.plans.length > 0 }; } catch (error) { return { ok: false, message: messageOf(error) }; } },
     async changePassword(oldPassword, newPassword) { try { await establishSession(await authApi.changePassword(oldPassword, newPassword)); return { ok: true }; } catch (error) { return { ok: false, message: messageOf(error) }; } },
-    async signOut() { setApiAccessToken(null); setSession(null); setIsGuest(false); await storeSession(null); },
-  }), [isGuest, isLoading, session]);
+    async signOut() { setApiAccessToken(null); setSession(null); await storeSession(null); },
+  }), [isLoading, session]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 export function useAuth() { const value = useContext(AuthContext); if (!value) throw new Error('useAuth must be used inside AuthProvider'); return value; }

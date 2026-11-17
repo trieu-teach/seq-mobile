@@ -20,7 +20,7 @@ function formatDate(value?: string) {
 
 export default function DashboardScreen() {
   const { session } = useAuth();
-  const { capacity, entitlement, error, group, loading, reload, slots } = useWorkspaceData();
+  const { capacity, entitlement, error, group, loading, reload, report, slots } = useWorkspaceData();
   const teacher = session?.role === "TEACHER";
   const active = slots.filter((slot) => slot.status === "ACTIVE");
   const limit = Number(group?.slotLimit) || (teacher ? 40 : 4);
@@ -66,6 +66,10 @@ export default function DashboardScreen() {
         <StatCard icon={{ ios: "person.2.fill", android: "groups", web: "groups" }} label={teacher ? "Học sinh" : "Hồ sơ con"} value={String(active.length)} tone="yellow" />
         <StatCard icon={{ ios: "calendar", android: "calendar_month", web: "calendar_month" }} label="Hạn gói" value={formatDate(entitlement?.expiresOn)} />
       </View>
+      {report ? <View style={styles.statsRow}>
+        <StatCard icon={{ ios: "book.closed.fill", android: "menu_book", web: "menu_book" }} label="Chương đã xong" value={String(report.summary.chaptersCompleted)} />
+        <StatCard icon={{ ios: "checkmark.circle.fill", android: "task_alt", web: "task_alt" }} label="Quiz đã nộp" value={`${report.summary.quizSubmitted}/${report.summary.quizAssigned}`} tone="yellow" />
+      </View> : null}
 
       <Pressable onPress={() => router.push('/subscribe' as never)} style={({ pressed }) => [styles.planLink, pressed && styles.pressed]}>
         <View style={styles.planLinkIcon}><SymbolView name={{ios:'wallet.bifold.fill',android:'workspace_premium',web:'workspace_premium'}} size={22} tintColor={colors.greenDark} type="monochrome" /></View>

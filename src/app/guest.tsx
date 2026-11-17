@@ -18,7 +18,7 @@ export default function GuestAccountScreen() {
     router.replace('/login');
   }
 
-  return <Screen title="Không gian khách" subtitle="Tài khoản đã kết nối · Chưa có gói học tập" action={<View style={styles.avatar}><Text style={styles.avatarText}>{session?.displayName?.trim().charAt(0).toUpperCase() || 'K'}</Text></View>}>
+  return <Screen title="Tài khoản chưa có gói" subtitle="Tài khoản đã kết nối · Chọn quyền Parent hoặc Teacher" action={<View style={styles.avatar}><Text style={styles.avatarText}>{session?.displayName?.trim().charAt(0).toUpperCase() || 'P'}</Text></View>}>
     <View style={styles.hero}>
       <Image source={require('../../assets/images/finteen/welcome-bg-v3.png')} contentFit="cover" contentPosition="center" style={StyleSheet.absoluteFill} />
       <LinearGradient colors={['rgba(9,49,33,.96)','rgba(9,49,33,.75)','rgba(9,49,33,.12)']} end={{x:1,y:0}} start={{x:0,y:0}} style={StyleSheet.absoluteFill} />
