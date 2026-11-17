@@ -1,142 +1,39 @@
-import { Image } from "expo-image";
-import { StyleSheet, Text, View } from "react-native";
-import { Screen } from "@/components/screen";
-import { Card, Pill, SectionTitle } from "@/components/ui";
-import { achievements, dailySummary } from "@/data/dashboard";
-import { colors, radius, type } from "@/theme/tokens";
-export default function SummariesScreen() {
-  return (
-    <Screen
-      title="Tổng kết"
-      subtitle="Báo cáo theo chương và tổng kết hằng ngày"
-    >
-      <View style={styles.reportHero}><Image source={require('../../../assets/images/finteen/rewards-bg-v3.png')} style={styles.reportImage} contentFit="cover" contentPosition="center" /><View style={styles.reportShade}/><View style={styles.reportCopy}><Text style={styles.reportKicker}>THÀNH TỰU GẦN ĐÂY</Text><Text style={styles.reportTitle}>Mỗi bước nhỏ đều đáng tự hào</Text><Text style={styles.reportSubtitle}>Theo dõi huy hiệu, chứng chỉ và những cột mốc mới của trẻ.</Text></View></View>
-      <Card style={styles.summary}>
-        <View style={styles.summaryTop}>
-          <View style={styles.ai}>
-            <Text style={styles.aiText}>✦</Text>
-          </View>
-          <View>
-            <Text style={styles.date}>{dailySummary.date}</Text>
-            <Pill color={colors.purpleSoft} textColor={colors.purple}>
-              {dailySummary.source}
-            </Pill>
-          </View>
-        </View>
-        <Text style={styles.summaryText}>{dailySummary.text}</Text>
-        <View style={styles.suggestion}>
-          <Text style={styles.suggestionLabel}>GỢI Ý ĐỒNG HÀNH</Text>
-          <Text style={styles.suggestionText}>{dailySummary.suggestion}</Text>
-        </View>
-      </Card>
-      <SectionTitle>Huy hiệu đã nhận</SectionTitle>
-      <View style={styles.grid}>
-        {achievements.map((item) => (
-          <Card key={item.code} style={styles.badge}>
-            <View style={styles.badgeIcon}>
-              <Text style={styles.badgeEmoji}>{item.icon}</Text>
-            </View>
-            <Text style={styles.badgeName}>{item.name}</Text>
-            <Text style={styles.badgeDate}>{item.earnedAt}</Text>
-          </Card>
-        ))}
-      </View>
-      <SectionTitle>Chứng chỉ</SectionTitle>
-      <Card style={styles.empty}>
-        <Text style={styles.emptyIcon}>📜</Text>
-        <View style={styles.emptyCopy}>
-          <Text style={styles.emptyTitle}>Chưa có chứng chỉ</Text>
-          <Text style={styles.emptyText}>
-            Chứng chỉ sẽ xuất hiện khi trẻ đạt điều kiện của chương trình.
-          </Text>
-        </View>
-      </Card>
-      <View style={styles.privacy}>
-        <Text style={styles.privacyTitle}>
-          Quyền riêng tư trong tổng kết AI
-        </Text>
-        <Text style={styles.privacyText}>
-          Hệ thống chỉ gửi số liệu và mã slot cho nhà cung cấp AI, không gửi tên
-          trẻ hay nội dung lựa chọn thô. Nếu AI lỗi, báo cáo theo luật vẫn được
-          tạo.
-        </Text>
-      </View>
-    </Screen>
-  );
+import { router } from 'expo-router';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { NoticeBanner } from '@/components/feedback';
+import { Screen } from '@/components/screen';
+import { Card, Progress } from '@/components/ui';
+import { useWorkspaceData } from '@/features/account/use-workspace-data';
+import { useAuth } from '@/features/auth/auth-context';
+import { colors, radius, shadow, type } from '@/theme/tokens';
+
+function dateLabel(value: string | null) {
+  if (!value) return 'Chưa có hoạt động';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
 }
+
+export default function ReportsScreen() {
+  const { session } = useAuth();
+  const { error, group, loading, reload, report } = useWorkspaceData();
+  const teacher = session?.role === 'TEACHER';
+  const summary = report?.summary;
+  const completion = summary?.totalChapters ? Math.min(100, summary.chaptersCompleted / summary.totalChapters * 100) : 0;
+  return <Screen title="Tổng kết" subtitle={teacher ? 'Tiến độ và kết quả của lớp học' : 'Theo dõi hành trình học tập của con'} action={<Pressable accessibilityLabel="Làm mới báo cáo" onPress={reload} style={styles.refresh}><Text style={styles.refreshText}>↻</Text></Pressable>}>
+    {loading ? <ActivityIndicator color={colors.greenDark} size="large" /> : null}
+    {error ? <NoticeBanner kind="error" message={error} /> : null}
+    {!loading && !report ? <Card><Text style={styles.empty}>{group ? 'Chưa có báo cáo cho nhóm này.' : `Hãy tạo ${teacher ? 'lớp học' : 'nhóm gia đình'} để bắt đầu theo dõi.`}</Text></Card> : null}
+    {report && summary ? <>
+      <View style={styles.hero}><Text style={styles.eyebrow}>{teacher ? 'BÁO CÁO LỚP HỌC' : 'BÁO CÁO GIA ĐÌNH'}</Text><Text style={styles.heroTitle}>{report.group.name}</Text><Text style={styles.heroMeta}>{summary.active}/{summary.learners} hồ sơ đang hoạt động · {summary.activeLast7Days} hoạt động trong 7 ngày</Text><View style={styles.progress}><Progress value={completion} color={colors.yellow} /></View><Text style={styles.progressText}>{summary.chaptersCompleted}/{summary.totalChapters} chương đã hoàn thành</Text></View>
+      <View style={styles.stats}><Stat value={String(summary.learners)} label={teacher ? 'Học sinh' : 'Hồ sơ'} /><Stat value={`${summary.quizSubmitted}/${summary.quizAssigned}`} label="Quiz đã nộp" /><Stat value={summary.averageScore == null ? '—' : summary.averageScore.toFixed(1)} label="Điểm TB" /></View>
+      <View><Text style={styles.sectionEyebrow}>CHI TIẾT NGƯỜI HỌC</Text><Text style={styles.sectionTitle}>Tiến độ gần nhất</Text></View>
+      {report.rows.length ? report.rows.map((row) => <Pressable key={row.slotId} onPress={() => router.push({ pathname: '/learner/[id]', params: { id: row.slotId } })} style={({ pressed }) => [styles.row, pressed && styles.pressed]}><View style={styles.avatar}><Text style={styles.avatarText}>{(row.displayName ?? '?').charAt(0).toUpperCase()}</Text></View><View style={styles.rowCopy}><View style={styles.rowHead}><Text numberOfLines={1} style={styles.name}>{row.displayName ?? 'Đã xóa dữ liệu'}</Text><Text style={styles.chapter}>{row.completedChapters}/{summary.totalChapters}</Text></View><Progress value={summary.totalChapters ? Math.min(100, row.completedChapters / summary.totalChapters * 100) : 0} color={colors.green} /><Text style={styles.meta}>{dateLabel(row.lastActiveAt)} · Quiz {row.quizSubmitted}/{row.quizAssigned}</Text></View><Text style={styles.chevron}>›</Text></Pressable>) : <Card><Text style={styles.empty}>Nhóm chưa có người học để tổng hợp.</Text></Card>}
+    </> : null}
+  </Screen>;
+}
+
+function Stat({ value, label }: { value: string; label: string }) { return <Card style={styles.stat}><Text style={styles.statValue}>{value}</Text><Text style={styles.statLabel}>{label}</Text></Card>; }
+
 const styles = StyleSheet.create({
-  reportHero:{height:210,borderRadius:radius.xl,overflow:"hidden"},
-  reportImage:{width:"100%",height:"100%"},
-  reportShade:{position:"absolute",left:0,right:0,top:0,bottom:0,backgroundColor:"rgba(20,40,30,.42)"},
-  reportCopy:{position:"absolute",left:16,right:16,bottom:15},
-  reportKicker:{...type.eyebrow,color:colors.yellow},
-  reportTitle:{color:colors.white,fontSize:20,fontWeight:"900",marginTop:5},
-  reportSubtitle:{color:"#E5EFEA",fontSize:11,lineHeight:16,marginTop:3},
-  summary: { backgroundColor: "#F4EFFF", borderColor: "#DCCFFC" },
-  summaryTop: { flexDirection: "row", alignItems: "center", gap: 12 },
-  ai: {
-    width: 48,
-    height: 48,
-    borderRadius: 17,
-    backgroundColor: colors.purple,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  aiText: { color: colors.white, fontSize: 24, fontWeight: "900" },
-  date: { color: colors.ink, fontWeight: "900", marginBottom: 5 },
-  summaryText: { ...type.body, color: colors.inkSoft, marginTop: 16 },
-  suggestion: {
-    backgroundColor: colors.white,
-    borderRadius: radius.md,
-    padding: 14,
-    marginTop: 15,
-  },
-  suggestionLabel: { ...type.eyebrow, color: colors.green },
-  suggestionText: {
-    color: colors.inkSoft,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 5,
-  },
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  badge: { width: "48%", padding: 14, alignItems: "center" },
-  badgeIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 20,
-    backgroundColor: colors.yellowSoft,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badgeEmoji: { fontSize: 28 },
-  badgeName: {
-    color: colors.ink,
-    fontSize: 13,
-    fontWeight: "900",
-    textAlign: "center",
-    marginTop: 9,
-  },
-  badgeDate: { color: colors.muted, fontSize: 9, marginTop: 3 },
-  empty: { flexDirection: "row", alignItems: "center", gap: 13 },
-  emptyIcon: { fontSize: 31 },
-  emptyCopy: { flex: 1 },
-  emptyTitle: { color: colors.ink, fontWeight: "900" },
-  emptyText: {
-    color: colors.muted,
-    fontSize: 11,
-    lineHeight: 17,
-    marginTop: 3,
-  },
-  privacy: {
-    padding: 16,
-    borderRadius: radius.lg,
-    backgroundColor: colors.greenSoft,
-  },
-  privacyTitle: { color: colors.greenDark, fontWeight: "900" },
-  privacyText: {
-    color: colors.inkSoft,
-    fontSize: 11,
-    lineHeight: 17,
-    marginTop: 5,
-  },
+  refresh:{width:46,height:46,borderRadius:15,backgroundColor:colors.greenSoft,alignItems:'center',justifyContent:'center'},refreshText:{fontSize:24,color:colors.greenDark,fontWeight:'900'},hero:{padding:20,borderRadius:radius.xl,backgroundColor:colors.ink,...shadow.large},eyebrow:{...type.eyebrow,color:colors.yellow},heroTitle:{color:colors.white,fontSize:24,fontWeight:'900',marginTop:5},heroMeta:{color:'#BDD5C9',fontSize:11,lineHeight:17,marginTop:6},progress:{marginTop:20},progressText:{color:colors.white,fontSize:10,fontWeight:'800',marginTop:8},stats:{flexDirection:'row',gap:8},stat:{flex:1,padding:12,alignItems:'center'},statValue:{color:colors.greenDark,fontSize:18,fontWeight:'900'},statLabel:{color:colors.muted,fontSize:8,fontWeight:'700',marginTop:4,textAlign:'center'},sectionEyebrow:{...type.eyebrow,color:colors.greenDark},sectionTitle:{color:colors.ink,fontSize:19,fontWeight:'900',marginTop:3},row:{minHeight:88,padding:13,borderRadius:radius.lg,backgroundColor:colors.white,borderWidth:1,borderColor:colors.line,flexDirection:'row',alignItems:'center',gap:11,...shadow.card},pressed:{opacity:.72,transform:[{scale:.99}]},avatar:{width:46,height:46,borderRadius:15,backgroundColor:colors.yellowSoft,alignItems:'center',justifyContent:'center'},avatarText:{color:colors.ink,fontWeight:'900'},rowCopy:{flex:1,gap:6},rowHead:{flexDirection:'row',alignItems:'center',gap:8},name:{flex:1,color:colors.ink,fontSize:13,fontWeight:'900'},chapter:{color:colors.greenDark,fontSize:11,fontWeight:'900'},meta:{color:colors.muted,fontSize:9},chevron:{color:colors.greenDark,fontSize:27},empty:{color:colors.muted,textAlign:'center',lineHeight:20},
 });

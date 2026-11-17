@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { Question, QuizDetail, QuizResults, QuizSummary } from './types';
+import type { Question, QuizDetail, QuizResults, QuizSlotResult, QuizSummary } from './types';
 
 const idPath = (id: string) => encodeURIComponent(id);
 
@@ -21,4 +21,6 @@ export const quizzesApi = {
   remove: (quizId: string) => apiRequest<void>(`/api/quizzes/${idPath(quizId)}`, { authenticated: true, method: 'DELETE' }),
   publish: (quizId: string) => apiRequest<QuizSummary>(`/api/quizzes/${idPath(quizId)}/publish`, { authenticated: true, method: 'POST' }),
   results: (quizId: string) => apiRequest<QuizResults>(`/api/quizzes/${idPath(quizId)}/results`, { authenticated: true }),
+  slotResult: (quizId: string, slotId: string) =>
+    apiRequest<QuizSlotResult>(`/api/quizzes/${idPath(quizId)}/results/${idPath(slotId)}`, { authenticated: true }),
 };
