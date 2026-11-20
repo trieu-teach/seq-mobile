@@ -55,6 +55,7 @@ function RootNavigator() {
           options={{ animation: "slide_from_bottom" }}
         />
         <Stack.Screen name="quiz/edit" options={{ animation: "slide_from_right" }} />
+        <Stack.Screen name="quiz/questions" options={{ animation: "slide_from_right" }} />
         <Stack.Screen name="change-password" options={{ animation: "slide_from_right" }} />
       </Stack.Protected>
     </Stack>

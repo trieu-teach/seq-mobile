@@ -1,5 +1,5 @@
 import { apiRequest } from './client';
-import type { Question, QuizDetail, QuizResults, QuizSlotResult, QuizSummary } from './types';
+import type { Question, QuestionInput, QuestionPage, QuizDetail, QuizResults, QuizSlotResult, QuizSummary } from './types';
 
 const idPath = (id: string) => encodeURIComponent(id);
 
@@ -10,8 +10,18 @@ export const quizzesApi = {
       if (value?.trim()) params.set(key, value.trim());
     });
     const query = params.toString();
-    return apiRequest<Question[]>(`/api/questions${query ? `?${query}` : ''}`, { authenticated: true });
+    return apiRequest<QuestionPage>(`/api/questions${query ? `?${query}` : ''}`, { authenticated: true });
   },
+  myQuestions: (filters: { q?: string; standard?: string; concept?: string; pool?: string } = {}) => {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => { if (value?.trim()) params.set(key, value.trim()); });
+    const query = params.toString();
+    return apiRequest<QuestionPage>(`/api/questions/mine${query ? `?${query}` : ''}`, { authenticated: true });
+  },
+  createMyQuestions: (questions: QuestionInput[]) => apiRequest<Question[]>('/api/questions/mine', { authenticated: true, body: questions }),
+  updateMyQuestion: (questionId: string, question: QuestionInput) => apiRequest<Question>(`/api/questions/mine/${idPath(questionId)}`, { authenticated: true, method: 'PUT', body: question }),
+  deleteMyQuestion: (questionId: string) => apiRequest<void>(`/api/questions/mine/${idPath(questionId)}`, { authenticated: true, method: 'DELETE' }),
+  copyQuestion: (questionId: string) => apiRequest<Question>(`/api/questions/${idPath(questionId)}/copy`, { authenticated: true, method: 'POST' }),
   list: (groupId: string) => apiRequest<QuizSummary[]>(`/api/quizzes?groupId=${idPath(groupId)}`, { authenticated: true }),
   get: (quizId: string) => apiRequest<QuizDetail>(`/api/quizzes/${idPath(quizId)}`, { authenticated: true }),
   create: (input: { groupId: string; title: string; questionIds: string[]; dueAt: string }) =>

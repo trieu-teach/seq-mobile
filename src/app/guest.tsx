@@ -18,7 +18,7 @@ export default function GuestAccountScreen() {
     router.replace('/login');
   }
 
-  return <Screen title="Tài khoản chưa có gói" subtitle="Tài khoản đã kết nối · Chọn quyền Parent hoặc Teacher" action={<View style={styles.avatar}><Text style={styles.avatarText}>{session?.displayName?.trim().charAt(0).toUpperCase() || 'P'}</Text></View>}>
+  return <Screen title="Tài khoản chưa có gói" subtitle="Chọn gói dành cho phụ huynh hoặc giáo viên" action={<View style={styles.avatar}><Text style={styles.avatarText}>{session?.displayName?.trim().charAt(0).toUpperCase() || 'P'}</Text></View>}>
     <View style={styles.hero}>
       <Image source={require('../../assets/images/finteen/welcome-bg-v3.png')} contentFit="cover" contentPosition="center" style={StyleSheet.absoluteFill} />
       <LinearGradient colors={['rgba(9,49,33,.96)','rgba(9,49,33,.75)','rgba(9,49,33,.12)']} end={{x:1,y:0}} start={{x:0,y:0}} style={StyleSheet.absoluteFill} />
@@ -39,7 +39,7 @@ export default function GuestAccountScreen() {
 
     <Card style={styles.demoCard}>
       <View style={styles.demoIcon}><SymbolView name={{ios:'desktopcomputer',android:'computer',web:'computer'}} size={27} tintColor={colors.yellow} type="monochrome" /></View>
-      <View style={styles.flex}><Text style={styles.demoEyebrow}>DEMO GAME</Text><Text style={styles.demoTitle}>Demo chỉ xem được trên bản Web</Text><Text style={styles.demoText}>Ứng dụng mobile giới thiệu nội dung chương. Hãy sử dụng FinTeen trên trình duyệt Web để trải nghiệm bản demo game.</Text></View>
+      <View style={styles.flex}><Text style={styles.demoEyebrow}>TRẢI NGHIỆM THỬ</Text><Text style={styles.demoTitle}>Bản học thử có trên website</Text><Text style={styles.demoText}>Ứng dụng này dành cho phụ huynh và giáo viên theo dõi kết quả. Hãy mở FinTeen trên trình duyệt để trải nghiệm trò chơi học thử.</Text></View>
     </Card>
 
     <Card style={styles.accountCard}><View style={styles.flex}><Text style={styles.planLabel}>TÀI KHOẢN</Text><Text style={styles.accountName}>{session?.displayName}</Text><Text style={styles.accountEmail}>{session?.email}</Text></View><Pressable onPress={logout} style={styles.logout}><Text style={styles.logoutText}>Đăng xuất</Text></Pressable></Card>

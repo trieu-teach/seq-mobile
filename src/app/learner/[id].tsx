@@ -1,275 +1,47 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { Image } from "expo-image";
-import { router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { reportsApi, type SlotReport } from "@/api";
-import { NoticeBanner } from "@/components/feedback";
-import { Card, Pill, Progress } from "@/components/ui";
-import { chapterCatalog, indicatorMeta, type IndicatorKey } from "@/data/dashboard";
-import { colors, radius, shadow, spacing, type } from "@/theme/tokens";
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { reportsApi, type ChapterReport, type ConceptReport, type ReportChoice, type ReportSummaryText, type ReportWrongItem, type SlotReport } from '@/api';
+import { NoticeBanner } from '@/components/feedback';
+import { Card, Pill, Progress } from '@/components/ui';
+import { useAuth } from '@/features/auth/auth-context';
+import { colors, radius, shadow, spacing, type } from '@/theme/tokens';
 
-type ReportSection = "journey" | "indicators" | "achievements";
+const summaryFallback: Record<string,string>={WAITING_POST_TEST:'Bé chưa làm bài hậu trắc sau chương này.',GENERATING:'Hệ thống đang tổng hợp báo cáo…'};
+const bandLabels: Record<string,string>={NO_DATA:'Chưa có dữ liệu',PRACTICE:'Cần luyện thêm',FAMILIAR:'Đã làm quen',GOOD:'Nắm vững'};
+const ratio=(value?:{correct?:number;total?:number}|null)=>`${Number(value?.correct)||0}/${Number(value?.total)||0}`;
+const dateLabel=(value?:string|null)=>value?new Intl.DateTimeFormat('vi-VN',{dateStyle:'short',timeStyle:'short',timeZone:'Asia/Ho_Chi_Minh'}).format(new Date(value)):'Chưa có hoạt động';
+const itemText=(item:ReportChoice|ReportWrongItem)=>item.label||item.text||item.concept||item.question||('itemLabel'in item?item.itemLabel:'')||'Nội dung cần xem lại';
+const finalStatusLabels: Record<string,string>={WAITING_POST_TEST:'Đang chờ bài hậu trắc',GENERATING:'Đang tổng hợp',COMPLETE:'Đã hoàn thành',NONE:'Chưa có báo cáo'};
 
-function formatActivity(value: string | null) {
-  if (!value) return "Chưa có hoạt động";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(date);
-}
-
-export default function LearnerDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const [report, setReport] = useState<SlotReport | null>(null);
-  const [section, setSection] = useState<ReportSection>("journey");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const load = useCallback(async () => {
-    if (!id) return;
-    setLoading(true);
-    setError("");
-    try { setReport(await reportsApi.slot(id)); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "Không tải được báo cáo người học."); }
-    finally { setLoading(false); }
-  }, [id]);
-
-  // The initial server request intentionally owns this screen's loading state.
+export default function LearnerReportScreen(){
+  const {session}=useAuth(); const teacher=session?.role==='TEACHER';
+  const {id}=useLocalSearchParams<{id:string}>(); const [report,setReport]=useState<SlotReport|null>(null); const [loading,setLoading]=useState(true); const [error,setError]=useState('');
+  const load=useCallback(async()=>{if(!id)return;setLoading(true);setError('');try{setReport(await reportsApi.slot(id));}catch(reason){setError(reason instanceof Error?reason.message:'Không thể tải báo cáo học tập.');}finally{setLoading(false);}},[id]);
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => { void load(); }, [load]);
-
-  if (loading)
-    return <SafeAreaView style={styles.empty}><ActivityIndicator color={colors.green} size="large" /></SafeAreaView>;
-  if (!report)
-    return (
-      <SafeAreaView style={styles.empty}>
-        <NoticeBanner kind="error" message={error || "Không tìm thấy người học."} />
-        <Pressable onPress={() => void load()} style={styles.retry}><Text style={styles.retryText}>Thử lại</Text></Pressable>
-      </SafeAreaView>
-    );
-  const { learner, progress, indicators } = report;
-  const displayName = learner.displayName ?? "Đã xóa dữ liệu";
-  const chapters = Array.from({ length: Math.max(0, progress.totalChapters) }, (_, index) => index + 1);
-  const currentChapter = progress.continueChapter && chapters.includes(progress.continueChapter) ? progress.continueChapter : null;
-  const completedChapters = chapters.filter((chapter) => progress.chaptersDone.includes(chapter));
-  const notStartedChapters = chapters.filter((chapter) => chapter !== currentChapter && !progress.chaptersDone.includes(chapter));
-  return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
-      <View style={styles.header}>
-        <Pressable
-          onPress={() =>
-            router.canGoBack()
-              ? router.back()
-              : router.replace("/(tabs)/journey")
-          }
-          style={styles.back}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <View style={styles.headerCopy}>
-          <Text style={styles.headerLabel}>HỒ SƠ NGƯỜI HỌC</Text>
-          <Text style={styles.headerName}>{displayName}</Text>
-        </View>
-      </View>
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <Card style={styles.profile}>
-          <Image source={require('../../../assets/images/finteen/learner-detail-bg-v3.png')} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="center" />
-          <View style={styles.profileShade} />
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{displayName.charAt(0).toUpperCase()}</Text>
-          </View>
-          <View style={styles.profileCopy}>
-            <Text style={styles.name}>{displayName}</Text>
-            <Text style={styles.meta}>
-              Mã {learner.code ?? "—"} · {learner.group.name}
-            </Text>
-            <Text style={styles.active}>Hoạt động: {formatActivity(learner.lastActiveAt)}</Text>
-          </View>
-          <Pill>{progress.completedChapters}/{progress.totalChapters}</Pill>
-        </Card>
-        <View style={styles.stats}>
-          <Card style={styles.stat}>
-            <Text style={styles.statValue}>{progress.completedChapters}</Text>
-            <Text style={styles.statLabel}>Đã xong</Text>
-          </Card>
-          <Card style={styles.stat}>
-            <Text style={styles.statValue}>
-              {progress.continueChapter ?? "—"}
-            </Text>
-            <Text style={styles.statLabel}>Đang mở</Text>
-          </Card>
-          <Card style={styles.stat}>
-            <Text style={styles.statValue}>{progress.attemptIndex}</Text>
-            <Text style={styles.statLabel}>Lượt chơi</Text>
-          </Card>
-        </View>
-        <View style={styles.sectionTabs}>
-          <SectionTab active={section === "journey"} label="Hành trình" onPress={() => setSection("journey")} />
-          <SectionTab active={section === "indicators"} label="Chỉ số" onPress={() => setSection("indicators")} />
-          <SectionTab active={section === "achievements"} label="Thành tựu" onPress={() => setSection("achievements")} />
-        </View>
-
-        {section === "journey" ? <View style={styles.sectionContent}>
-          <View><Text style={styles.sectionEyebrow}>TIẾN ĐỘ HỌC TẬP</Text><Text style={styles.sectionTitle}>Hành trình {progress.totalChapters} chương</Text></View>
-          {currentChapter ? <ChapterGroup title="Đang học" count={1} tone="current"><ChapterCard chapterNumber={currentChapter} status="current" /></ChapterGroup> : null}
-          {completedChapters.length ? <ChapterGroup title="Đã hoàn thành" count={completedChapters.length} tone="complete">{completedChapters.map((chapter) => <ChapterCard key={chapter} chapterNumber={chapter} status="complete" />)}</ChapterGroup> : null}
-          {notStartedChapters.length ? <ChapterGroup title="Chưa học" count={notStartedChapters.length} tone="pending">{notStartedChapters.map((chapter) => <ChapterCard key={chapter} chapterNumber={chapter} status="pending" />)}</ChapterGroup> : null}
-          {!chapters.length ? <Card><Text style={styles.noData}>Chưa có chương học nào được phát hành.</Text></Card> : null}
-        </View> : null}
-
-        {section === "indicators" ? <View style={styles.sectionContent}>
-          <View><Text style={styles.sectionEyebrow}>KẾT QUẢ MÔ PHỎNG</Text><Text style={styles.sectionTitle}>Năm chỉ số hiện tại</Text></View>
-          {indicators ? <Card style={styles.indicatorCard}>
-            {(Object.entries(indicators) as [IndicatorKey, number][]).map(([key, value]) => {
-              const meta = indicatorMeta[key];
-              const level = value < 34 ? "Thấp" : value < 67 ? "Vừa" : "Cao";
-              return <View key={key} style={styles.indicator}>
-                <View style={styles.indicatorHead}><Text style={styles.indicatorLabel}>{meta.label}</Text><Text style={[styles.indicatorValue, { color: meta.color }]}>{value} · {level}</Text></View>
-                <Progress value={value} color={meta.color} />
-              </View>;
-            })}
-          </Card> : <Card><Text style={styles.noData}>Người học chưa có dữ liệu chỉ số.</Text></Card>}
-          <View style={styles.note}><Text style={styles.noteText}>Chỉ số phản ánh lựa chọn trong game, không phải điểm đúng–sai, đánh giá tính cách hoặc cơ sở để xếp hạng trẻ.</Text></View>
-        </View> : null}
-
-        {section === "achievements" ? <View style={styles.sectionContent}>
-          <View><Text style={styles.sectionEyebrow}>DẤU MỐC ĐÃ ĐẠT</Text><Text style={styles.sectionTitle}>Thành tựu</Text></View>
-          {report.achievements.length ? report.achievements.map((achievement) => <Card key={`${achievement.code}-${achievement.earnedAt}`} style={styles.achievement}><View style={styles.achievementIcon}><Text style={styles.achievementIconText}>★</Text></View><View style={styles.achievementCopy}><Text style={styles.achievementName}>{achievement.code}</Text><Text style={styles.achievementDate}>Đạt ngày {formatActivity(achievement.earnedAt)}</Text></View></Card>) : <Card style={styles.emptyState}><Text style={styles.emptyStateIcon}>☆</Text><Text style={styles.emptyStateTitle}>Chưa có thành tựu</Text><Text style={styles.emptyStateText}>Các huy hiệu và cột mốc sẽ xuất hiện tại đây khi người học đạt điều kiện.</Text></Card>}
-        </View> : null}
-      </ScrollView>
-    </SafeAreaView>
-  );
+  useEffect(()=>{void load();},[load]);
+  const generating=Boolean(report?.chapters?.some((chapter)=>chapter.summary?.status==='GENERATING')||report?.finalReport?.summary?.status==='GENERATING');
+  useEffect(()=>{if(!generating)return;const timer=setInterval(()=>void load(),30_000);return()=>clearInterval(timer);},[generating,load]);
+  if(loading&&!report)return <SafeAreaView style={styles.center}><ActivityIndicator color={colors.greenDark} size="large"/><Text style={styles.loading}>Đang tải báo cáo học tập…</Text></SafeAreaView>;
+  if(!report)return <SafeAreaView style={styles.center}><NoticeBanner kind="error" message={error||'Chưa có dữ liệu báo cáo.'}/><Pressable onPress={()=>void load()} style={styles.primary}><Text style={styles.primaryText}>Thử lại</Text></Pressable></SafeAreaView>;
+  const {learner,progress}=report;const completed=Number(progress.completedChapters)||report.chapters.length;const total=Number(progress.totalChapters)||Math.max(report.chapters.length,1);const percent=Math.min(100,Math.round(completed/total*100));
+  return <SafeAreaView style={styles.safe} edges={['top']}><View style={styles.header}><Pressable onPress={()=>router.canGoBack()?router.back():router.replace('/(tabs)/rewards')} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable><View style={styles.flex}><Text style={styles.eyebrow}>{teacher?'BÁO CÁO HỌC SINH':'BÁO CÁO CỦA CON'}</Text><Text style={styles.headerTitle}>{learner.displayName||'Hồ sơ học tập'}</Text></View><Pressable disabled={loading} onPress={()=>void load()} style={styles.refresh}><Text style={styles.refreshText}>↻</Text></Pressable></View><ScrollView contentContainerStyle={styles.content}>
+    {error?<NoticeBanner kind="error" message={error}/>:null}{generating?<Card style={styles.generating}><Text style={styles.generatingText}>Hệ thống đang tạo nhận xét. Báo cáo sẽ tự cập nhật mỗi 30 giây.</Text></Card>:null}
+    <Card style={styles.profile}><View style={styles.avatar}><Text style={styles.avatarText}>{(learner.displayName||'?').charAt(0).toUpperCase()}</Text></View><View style={styles.flex}><Text style={styles.name}>{learner.displayName||'Đã xóa dữ liệu'}</Text><Text style={styles.meta}>Mã {learner.code||'—'} · {learner.group.name}</Text><Text style={styles.meta}>Hoạt động: {dateLabel(learner.lastActiveAt)}</Text></View><Pill>{completed}/{total}</Pill></Card>
+    <Card><View style={styles.progressHead}><View><Text style={styles.sectionEyebrow}>HÀNH TRÌNH HỌC TẬP</Text><Text style={styles.sectionTitle}>Tiến độ từng chương</Text></View><Text style={styles.percent}>{percent}%</Text></View><Progress value={percent} color={colors.green}/><View style={styles.quickStats}><QuickStat value={String(completed)} label="Đã hoàn thành"/><QuickStat value={String(progress.continueChapter??'—')} label="Chương tiếp theo"/><QuickStat value={String(progress.attemptIndex||1)} label="Lần học"/></View></Card>
+    <View><Text style={styles.sectionEyebrow}>CHI TIẾT CHƯƠNG</Text><Text style={styles.sectionTitle}>Lựa chọn, trò chơi và hậu trắc</Text></View>
+    {report.chapters.length?report.chapters.map((chapter,index)=><ChapterCard key={chapter.chapter??chapter.chapterNumber??index} chapter={chapter} index={index}/>):<Card><Text style={styles.empty}>Chưa có dữ liệu chi tiết theo chương.</Text></Card>}
+    <View><Text style={styles.sectionEyebrow}>MỨC ĐỘ HIỂU</Text><Text style={styles.sectionTitle}>Khái niệm tài chính</Text></View>
+    {report.concepts.length?report.concepts.map((concept,index)=><ConceptCard key={concept.concept??index} value={concept}/>):<Card><Text style={styles.empty}>Chưa có dữ liệu khái niệm.</Text></Card>}
+    {report.finalReport?.status&&report.finalReport.status!=='NONE'?<Card style={styles.final}><Text style={styles.sectionTitle}>Tổng kết hành trình</Text><Summary value={report.finalReport.summary}/><Text style={styles.finalStatus}>Trạng thái: {finalStatusLabels[report.finalReport.status]||report.finalReport.status}</Text></Card>:null}
+  </ScrollView></SafeAreaView>;
 }
 
-function SectionTab({ active, label, onPress }: { active: boolean; label: string; onPress: () => void }) {
-  return <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }} onPress={onPress} style={[styles.sectionTab, active && styles.sectionTabActive]}><Text style={[styles.sectionTabText, active && styles.sectionTabTextActive]}>{label}</Text></Pressable>;
-}
+function Summary({value}:{value?:ReportSummaryText|null}){if(!value)return <Text style={styles.empty}>Chưa có nhận xét.</Text>;return <View style={styles.summary}><Text style={styles.summaryStatus}>{value.status==='COMPLETE'?'NHẬN XÉT':'ĐANG XỬ LÝ'}</Text><Text style={styles.summaryText}>{value.text||summaryFallback[value.status]||'Chưa có nhận xét.'}</Text></View>}
+function ChapterCard({chapter,index}:{chapter:ChapterReport;index:number}){const [open,setOpen]=useState(false);const number=chapter.chapter??chapter.chapterNumber??index+1;const choices=chapter.choices??chapter.deliberate??[];return <Card style={styles.chapter}><Pressable onPress={()=>setOpen((value)=>!value)} style={styles.chapterHead}><View style={styles.chapterNumber}><Text style={styles.chapterNumberText}>{number}</Text></View><View style={styles.flex}><Text style={styles.chapterTitle}>{chapter.title||`Chương ${number}`}</Text><Text style={styles.meta}>{chapter.reportStatus==='COMPLETE'?'Báo cáo đầy đủ':'Báo cáo tạm thời'}</Text></View><Text style={styles.chevron}>{open?'⌃':'⌄'}</Text></Pressable>{open?<View style={styles.chapterBody}><Summary value={chapter.summary}/><Metric label="Lựa chọn" value={String(choices.length)}/>{choices.length?<View style={styles.list}>{choices.map((item,i)=><Text key={item.id??i} style={styles.listItem}>• {itemText(item)}{item.deliberate!=null?` · ${item.deliberate?'Có chủ đích':'Chưa chủ đích'}`:''}</Text>)}</View>:null}<Metric label="Trò chơi" value={`${ratio(chapter.miniGames)} câu đúng`}/>{chapter.miniGames?.wrong?.length?<View style={styles.wrong}><Text style={styles.wrongTitle}>Nội dung cần xem lại</Text>{chapter.miniGames.wrong.map((item,i)=><Text key={item.id??item.itemId??i} style={styles.listItem}>• {itemText(item)}</Text>)}</View>:null}<Metric label="Hậu trắc" value={chapter.postTest?.status==='SUBMITTED'||Number(chapter.postTest?.total)>0?`${ratio(chapter.postTest)} câu đúng`:'Chưa hoàn thành'}/></View>:null}</Card>}
+function ConceptCard({value}:{value:ConceptReport}){return <Card style={styles.concept}><View style={styles.conceptHead}><Text style={styles.conceptName}>{value.concept||'Khái niệm'}</Text><Pill color={colors.greenSoft}>{bandLabels[value.band||'NO_DATA']||value.band}</Pill></View><View style={styles.conceptStats}><Metric label="Trong trò chơi" value={ratio(value.game)}/><Metric label="Hậu trắc" value={ratio(value.postTest)}/><Metric label="Tổng cộng" value={`${Number(value.correct)||0}/${Number(value.total)||0}`}/></View></Card>}
+function Metric({label,value}:{label:string;value:string}){return <View style={styles.metric}><Text style={styles.metricLabel}>{label}</Text><Text style={styles.metricValue}>{value}</Text></View>}
+function QuickStat({value,label}:{value:string;label:string}){return <View style={styles.quickStat}><Text style={styles.quickValue}>{value}</Text><Text style={styles.quickLabel}>{label}</Text></View>}
 
-function ChapterGroup({ title, count, tone, children }: { title: string; count: number; tone: "current" | "complete" | "pending"; children: ReactNode }) {
-  return <View style={styles.chapterGroup}><View style={styles.chapterGroupHeader}><View style={[styles.statusMarker, tone === "current" ? styles.markerCurrent : tone === "complete" ? styles.markerComplete : styles.markerPending]} /><Text style={styles.chapterGroupTitle}>{title}</Text><View style={styles.countBadge}><Text style={styles.countText}>{count}</Text></View></View><View style={styles.chapterList}>{children}</View></View>;
-}
-
-function ChapterCard({ chapterNumber, status }: { chapterNumber: number; status: "current" | "complete" | "pending" }) {
-  const metadata = chapterCatalog.find((item) => item.chapter === chapterNumber);
-  const label = status === "complete" ? "ĐÃ HOÀN THÀNH" : status === "current" ? "ĐANG HỌC" : "CHƯA HỌC";
-  return <Card style={[styles.chapter, status === "current" ? styles.chapterCurrent : status === "complete" ? styles.chapterComplete : styles.chapterPending]}>
-    {metadata ? <Image source={metadata.image} style={styles.chapterImage} contentFit="cover" /> : <View style={[styles.chapterImage, styles.imageFallback]}><Text style={styles.imageFallbackText}>{chapterNumber}</Text></View>}
-    <View style={styles.chapterCopy}><Text style={styles.chapterKicker}>CHƯƠNG {chapterNumber}</Text><Text numberOfLines={2} style={styles.chapterTitle}>{metadata?.title ?? `Chương ${chapterNumber}`}</Text><Text numberOfLines={1} style={styles.theme}>{metadata?.theme ?? "Nội dung học tập"}</Text></View>
-    <View style={[styles.chapterStatus, status === "current" ? styles.statusCurrent : status === "complete" ? styles.statusComplete : styles.statusPending]}><Text style={[styles.chapterStatusText, status === "current" ? styles.statusCurrentText : status === "complete" ? styles.statusCompleteText : styles.statusPendingText]}>{label}</Text></View>
-  </Card>;
-}
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.canvas },
-  empty: { flex: 1, alignItems: "center", justifyContent: "center", padding: spacing.lg, gap: 14 },
-  retry: { minHeight: 46, paddingHorizontal: 20, borderRadius: radius.md, backgroundColor: colors.ink, alignItems: "center", justifyContent: "center" },
-  retryText: { color: colors.yellow, fontWeight: "900" },
-  header: {
-    height: 68,
-    paddingHorizontal: spacing.lg,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  back: {
-    width: 39,
-    height: 39,
-    borderRadius: 20,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.line,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  backText: { fontSize: 30, lineHeight: 31, color: colors.ink },
-  headerCopy: { flex: 1 },
-  headerLabel: { ...type.eyebrow, color: colors.green, fontSize: 9 },
-  headerName: {
-    color: colors.ink,
-    fontSize: 17,
-    fontWeight: "900",
-    marginTop: 2,
-  },
-  content: { padding: spacing.lg, paddingBottom: 50, gap: spacing.lg },
-  profile: { minHeight: 205, flexDirection: "row", alignItems: "flex-end", gap: 12, overflow: "hidden", padding: 17 },
-  profileShade: { position: "absolute", inset: 0, backgroundColor: "rgba(8,40,27,.48)" },
-  avatar: {
-    width: 58,
-    height: 58,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.yellow,
-  },
-  avatarText: { fontSize: 22, fontWeight: "900", color: colors.ink },
-  profileCopy: { flex: 1 },
-  name: { color: colors.white, fontSize: 16, fontWeight: "900" },
-  meta: { color: "#E4EFE9", fontSize: 10, marginTop: 3 },
-  active: { color: colors.yellow, fontSize: 9, marginTop: 4 },
-  stats: { flexDirection: "row", gap: 9 },
-  stat: { flex: 1, padding: 12, alignItems: "center" },
-  statValue: { color: colors.greenDark, fontSize: 21, fontWeight: "900" },
-  statLabel: { color: colors.muted, fontSize: 9, marginTop: 3 },
-  sectionTabs: { flexDirection: "row", gap: 6, padding: 5, borderRadius: 17, backgroundColor: "#E8ECE8" },
-  sectionTab: { flex: 1, minHeight: 44, paddingHorizontal: 5, borderRadius: 13, alignItems: "center", justifyContent: "center" },
-  sectionTabActive: { backgroundColor: colors.ink, ...shadow.card },
-  sectionTabText: { color: colors.muted, fontSize: 10, fontWeight: "800" },
-  sectionTabTextActive: { color: colors.yellow, fontWeight: "900" },
-  sectionContent: { gap: 14 },
-  sectionEyebrow: { ...type.eyebrow, color: colors.green },
-  sectionTitle: { ...type.h2, color: colors.ink, marginTop: 4 },
-  chapterGroup: { gap: 9 },
-  chapterGroupHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  statusMarker: { width: 9, height: 9, borderRadius: 5 },
-  markerCurrent: { backgroundColor: "#D09C00" },
-  markerComplete: { backgroundColor: colors.green },
-  markerPending: { backgroundColor: "#AAB3AE" },
-  chapterGroupTitle: { color: colors.ink, fontSize: 13, fontWeight: "900" },
-  countBadge: { minWidth: 25, height: 23, paddingHorizontal: 7, borderRadius: 9, backgroundColor: colors.white, alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: colors.line },
-  countText: { color: colors.muted, fontSize: 9, fontWeight: "900" },
-  chapterList: { gap: 9 },
-  chapter: { minHeight: 102, padding: 10, overflow: "hidden", flexDirection: "row", alignItems: "center", gap: 11 },
-  chapterCurrent: { borderWidth: 2, borderColor: "#DFC23A", backgroundColor: "#FFFDF2" },
-  chapterComplete: { borderColor: "#B7DAC5", backgroundColor: "#FBFFFC" },
-  chapterPending: { backgroundColor: "#F5F6F4", borderColor: "#DDE1DD" },
-  chapterImage: { width: 78, height: 78, borderRadius: 15 },
-  imageFallback: { backgroundColor: colors.greenSoft, alignItems: "center", justifyContent: "center" },
-  imageFallbackText: { color: colors.greenDark, fontSize: 26, fontWeight: "900" },
-  chapterCopy: { flex: 1, paddingRight: 76 },
-  chapterKicker: { ...type.eyebrow, color: colors.green, fontSize: 8 },
-  chapterTitle: { color: colors.ink, fontSize: 13, lineHeight: 17, fontWeight: "900", marginTop: 3 },
-  theme: { color: colors.muted, fontSize: 9, marginTop: 3 },
-  chapterStatus: { position: "absolute", right: 9, top: 8, paddingHorizontal: 7, paddingVertical: 5, borderRadius: 8 },
-  statusCurrent: { backgroundColor: colors.yellowSoft },
-  statusComplete: { backgroundColor: colors.greenSoft },
-  statusPending: { backgroundColor: "#E6E9E7" },
-  chapterStatusText: { fontSize: 7, fontWeight: "900" },
-  statusCurrentText: { color: "#806500" },
-  statusCompleteText: { color: colors.greenDark },
-  statusPendingText: { color: colors.muted },
-  indicatorCard: { gap: 19 },
-  indicator: { gap: 8 },
-  indicatorHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  indicatorLabel: { color: colors.inkSoft, fontSize: 12, fontWeight: "900" },
-  indicatorValue: { fontSize: 11, fontWeight: "900" },
-  noData: { color: colors.muted, fontSize: 11, textAlign: "center" },
-  achievement: { flexDirection: "row", alignItems: "center", gap: 12 },
-  achievementIcon: { width: 48, height: 48, borderRadius: 16, backgroundColor: colors.yellowSoft, alignItems: "center", justifyContent: "center" },
-  achievementIconText: { color: "#977700", fontSize: 24 },
-  achievementCopy: { flex: 1 },
-  achievementName: { color: colors.ink, fontSize: 13, fontWeight: "900" },
-  achievementDate: { color: colors.muted, fontSize: 9, marginTop: 3 },
-  emptyState: { alignItems: "center", paddingVertical: 28 },
-  emptyStateIcon: { color: colors.green, fontSize: 35 },
-  emptyStateTitle: { color: colors.ink, fontSize: 15, fontWeight: "900", marginTop: 9 },
-  emptyStateText: { color: colors.muted, fontSize: 10, lineHeight: 16, textAlign: "center", marginTop: 5, maxWidth: 270 },
-  note: {
-    padding: 15,
-    borderRadius: radius.lg,
-    backgroundColor: colors.yellowSoft,
-    ...shadow.card,
-  },
-  noteText: { color: "#756A3B", fontSize: 11, lineHeight: 17 },
-});
+const styles=StyleSheet.create({safe:{flex:1,backgroundColor:colors.canvas},center:{flex:1,backgroundColor:colors.canvas,alignItems:'center',justifyContent:'center',padding:spacing.lg,gap:14},loading:{color:colors.muted},generating:{backgroundColor:colors.yellowSoft,borderColor:'#E4D57A'},generatingText:{color:'#756A3B',fontSize:11,lineHeight:17,fontWeight:'800'},header:{minHeight:68,paddingHorizontal:spacing.lg,flexDirection:'row',alignItems:'center',gap:12},back:{width:42,height:42,borderRadius:14,backgroundColor:colors.white,borderWidth:1,borderColor:colors.line,alignItems:'center',justifyContent:'center'},backText:{fontSize:30,lineHeight:32,color:colors.ink},flex:{flex:1},eyebrow:{...type.eyebrow,color:colors.green},headerTitle:{color:colors.ink,fontSize:17,fontWeight:'900',marginTop:2},refresh:{width:42,height:42,borderRadius:14,backgroundColor:colors.greenSoft,alignItems:'center',justifyContent:'center'},refreshText:{fontSize:23,color:colors.greenDark,fontWeight:'900'},content:{padding:spacing.lg,paddingBottom:60,gap:14},profile:{flexDirection:'row',alignItems:'center',gap:12,backgroundColor:colors.ink,borderColor:colors.ink},avatar:{width:54,height:54,borderRadius:18,backgroundColor:colors.yellow,alignItems:'center',justifyContent:'center'},avatarText:{color:colors.ink,fontSize:20,fontWeight:'900'},name:{color:colors.white,fontSize:15,fontWeight:'900'},meta:{color:'#C5D9CF',fontSize:9,marginTop:4},progressHead:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:12},sectionEyebrow:{...type.eyebrow,color:colors.green},sectionTitle:{...type.h2,color:colors.ink,marginTop:3},percent:{color:colors.greenDark,fontSize:24,fontWeight:'900'},quickStats:{flexDirection:'row',marginTop:15},quickStat:{flex:1,alignItems:'center'},quickValue:{color:colors.ink,fontSize:18,fontWeight:'900'},quickLabel:{color:colors.muted,fontSize:8,marginTop:3},chapter:{padding:0,overflow:'hidden'},chapterHead:{minHeight:78,padding:13,flexDirection:'row',alignItems:'center',gap:11},chapterNumber:{width:42,height:42,borderRadius:14,backgroundColor:colors.greenSoft,alignItems:'center',justifyContent:'center'},chapterNumberText:{color:colors.greenDark,fontSize:15,fontWeight:'900'},chapterTitle:{color:colors.ink,fontSize:13,fontWeight:'900'},chevron:{color:colors.greenDark,fontSize:21},chapterBody:{padding:14,borderTopWidth:1,borderTopColor:colors.line,gap:10},summary:{padding:12,borderRadius:radius.md,backgroundColor:colors.yellowSoft},summaryStatus:{...type.eyebrow,color:'#806500'},summaryText:{color:colors.inkSoft,fontSize:11,lineHeight:17,marginTop:4},metric:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:10},metricLabel:{color:colors.muted,fontSize:10,fontWeight:'700'},metricValue:{color:colors.ink,fontSize:11,fontWeight:'900'},list:{gap:5,paddingLeft:5},listItem:{color:colors.inkSoft,fontSize:10,lineHeight:15},wrong:{padding:11,borderRadius:radius.md,backgroundColor:colors.coralSoft,gap:5},wrongTitle:{color:colors.coral,fontSize:10,fontWeight:'900'},concept:{gap:12},conceptHead:{flexDirection:'row',alignItems:'center',gap:10},conceptName:{flex:1,color:colors.ink,fontSize:13,fontWeight:'900'},conceptStats:{gap:8},final:{borderColor:colors.green,backgroundColor:'#F5FBF7'},finalStatus:{color:colors.muted,fontSize:9},empty:{color:colors.muted,textAlign:'center',lineHeight:18},primary:{minHeight:48,paddingHorizontal:20,borderRadius:radius.md,backgroundColor:colors.ink,alignItems:'center',justifyContent:'center',...shadow.button},primaryText:{color:colors.yellow,fontWeight:'900'}});
