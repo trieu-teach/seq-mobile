@@ -3,7 +3,7 @@ export type GroupContext = 'FAMILY' | 'CLASS';
 export type Account = { id: string; email: string; displayName: string; phone?: string | null; plans: AccountPlan[]; roles: string[] };
 export type TokenResult = { accessToken: string; refreshToken?: string | null; expiresIn: number };
 export type Entitlement = { id: string; kind: AccountPlan; startsOn: string; expiresOn: string; [key: string]: unknown };
-export type Group = { id: string; name: string; context: GroupContext; status?: string; closedAt?: string | null; consentConfirmed?: boolean; slotLimit?: number; slotUsed?: number; plannedSize?: number; [key: string]: unknown };
+export type Group = { id: string; name: string; context: GroupContext; status?: string; closedAt?: string | null; consentConfirmed?: boolean; slotLimit?: number; slotUsed?: number; [key: string]: unknown };
 export type Slot = { id: string; code?: string; displayName: string; badge?: string | null; status?: string; locked?: boolean; groupContext?: GroupContext; [key: string]: unknown };
 export type GroupCapacity = number | { free?: number; available?: number };
 export type SlotQuota = { context?: GroupContext; plan?: AccountPlan; limit: number; used: number; reserved: number; free: number; base: number; extra: number; wiped: number };
@@ -29,7 +29,18 @@ export type Question = {
   reference?: unknown;
 };
 export type QuestionInput = { stem: string; options: string[]; correctIndex: number };
+export type CreatedQuestionReference = { index: number; id: string; reused: boolean };
 export type QuestionPage = Question[] | { items?: Question[] };
+export type QuizMode = 'PRACTICE' | 'TEST';
+export type QuizWriteInput = {
+  title: string;
+  questionIds: string[];
+  newQuestions?: QuestionInput[];
+  dueAt: string;
+  mode: QuizMode;
+  drawCount?: number | null;
+  durationMinutes?: number | null;
+};
 export type QuizSummary = {
   id: string;
   groupId: string;
@@ -40,6 +51,9 @@ export type QuizSummary = {
   dueAt: string | null;
   publishedAt: string | null;
   submittedCount: number;
+  mode?: QuizMode | null;
+  drawCount?: number | null;
+  durationSeconds?: number | null;
 };
 export type QuizDetail = { quiz: QuizSummary; questions: Question[] };
 export type QuizResultRow = {
@@ -69,7 +83,7 @@ export type LearnerIndicators = {
   goal: number;
 };
 
-export type ReportGenerationStatus = 'WAITING_POST_TEST' | 'GENERATING' | 'COMPLETE' | string;
+export type ReportGenerationStatus = 'WAITING_POST_TEST' | 'GENERATING' | 'READY' | 'FALLBACK';
 export type ReportSummaryText = { status: ReportGenerationStatus; text?: string | null };
 export type ReportRatio = { correct?: number; total?: number };
 export type ReportChoice = { id?: string; label?: string; text?: string; concept?: string; question?: string; deliberate?: boolean };

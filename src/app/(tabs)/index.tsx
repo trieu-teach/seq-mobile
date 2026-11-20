@@ -59,7 +59,7 @@ export default function DashboardScreen() {
 
       <View style={styles.statsRow}>
         <StatCard icon={{ ios: "person.2.fill", android: "groups", web: "groups" }} label={teacher ? "Học sinh" : "Hồ sơ con"} value={String(active.length)} tone="yellow" />
-        <StatCard icon={{ ios: "wallet.bifold.fill", android: "account_balance_wallet", web: "account_balance_wallet" }} label="Slot còn lại" value={String(available)} />
+        <StatCard icon={{ ios: "wallet.bifold.fill", android: "account_balance_wallet", web: "account_balance_wallet" }} label={teacher ? "Chỗ còn trong lớp" : "Hồ sơ còn lại"} value={String(available)} />
       </View>
       {report ? <View style={styles.statsRow}>
         <StatCard icon={{ ios: "book.closed.fill", android: "menu_book", web: "menu_book" }} label="Chương đã xong" value={String(report.summary.chaptersCompleted)} />

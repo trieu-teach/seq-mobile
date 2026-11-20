@@ -9,5 +9,4 @@ export const groupsApi = {
   consent: (groupId: string) => apiRequest<void>(`/api/groups/${idPath(groupId)}/consent`, { authenticated: true, method: 'POST' }),
   close: (groupId: string) => apiRequest<void>(`/api/groups/${idPath(groupId)}/close`, { authenticated: true, method: 'POST' }),
   quota: () => apiRequest<QuotaResponse>('/api/me/quota', { authenticated: true }),
-  updatePlannedSize: (groupId: string, plannedSize: number) => apiRequest<Group>(`/api/groups/${idPath(groupId)}`, { authenticated: true, method: 'PATCH', body: { plannedSize } }),
 };
