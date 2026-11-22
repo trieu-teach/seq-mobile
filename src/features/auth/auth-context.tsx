@@ -6,7 +6,7 @@ import { setApiAccessToken } from '@/api/client';
 
 const SESSION_KEY = 'finteen.account.session.v1';
 const MOBILE_ROLE_ERROR_MESSAGE =
-  'Ứng dụng mobile này chỉ dành cho phụ huynh và giáo viên. Vui lòng sử dụng đúng tài khoản.';
+  'Ứng dụng này chỉ dành cho phụ huynh và giáo viên. Vui lòng đăng nhập bằng tài khoản phù hợp.';
 const ALLOWED_MOBILE_ROLES = new Set(['PARENT', 'TEACHER', 'ACCOUNT', 'USER']);
 
 class UnsupportedMobileRoleError extends Error {

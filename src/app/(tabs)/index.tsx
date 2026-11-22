@@ -12,19 +12,14 @@ import { colors, shadow, type } from "@/theme/tokens";
 const teacherArt = require("../../../assets/images/finteen/dashboard-teacher-bg-v2.png");
 const parentArt = require("../../../assets/images/finteen/dashboard-parent-bg-v2.png");
 
-function formatDate(value?: string) {
-  if (!value) return "Chưa có";
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("vi-VN").format(date);
-}
-
 export default function DashboardScreen() {
   const { session } = useAuth();
-  const { capacity, entitlement, error, group, loading, reload, report, slots } = useWorkspaceData();
+  const { capacity, entitlement, error, group, loading, quota, reload, report, slots } = useWorkspaceData();
   const teacher = session?.role === "TEACHER";
   const active = slots.filter((slot) => slot.status === "ACTIVE");
-  const limit = Number(group?.slotLimit) || (teacher ? 40 : 4);
-  const available = capacity ?? Math.max(0, limit - active.length);
+  const limit = Number(group?.slotLimit) || Number(quota?.limit) || (teacher ? 40 : 4);
+  const quotaFree = Number(quota?.free);
+  const available = capacity ?? (Number.isFinite(quotaFree) ? quotaFree : Math.max(0, limit - active.length));
   const firstName = session?.displayName?.trim().split(/\s+/).at(-1) ?? "bạn";
 
   return (
@@ -64,16 +59,16 @@ export default function DashboardScreen() {
 
       <View style={styles.statsRow}>
         <StatCard icon={{ ios: "person.2.fill", android: "groups", web: "groups" }} label={teacher ? "Học sinh" : "Hồ sơ con"} value={String(active.length)} tone="yellow" />
-        <StatCard icon={{ ios: "calendar", android: "calendar_month", web: "calendar_month" }} label="Hạn gói" value={formatDate(entitlement?.expiresOn)} />
+        <StatCard icon={{ ios: "wallet.bifold.fill", android: "account_balance_wallet", web: "account_balance_wallet" }} label={teacher ? "Chỗ còn trong lớp" : "Hồ sơ còn lại"} value={String(available)} />
       </View>
       {report ? <View style={styles.statsRow}>
         <StatCard icon={{ ios: "book.closed.fill", android: "menu_book", web: "menu_book" }} label="Chương đã xong" value={String(report.summary.chaptersCompleted)} />
-        <StatCard icon={{ ios: "checkmark.circle.fill", android: "task_alt", web: "task_alt" }} label="Quiz đã nộp" value={`${report.summary.quizSubmitted}/${report.summary.quizAssigned}`} tone="yellow" />
+        <StatCard icon={{ ios: "checkmark.circle.fill", android: "task_alt", web: "task_alt" }} label="Bài đã nộp" value={`${report.summary.quizSubmitted}/${report.summary.quizAssigned}`} tone="yellow" />
       </View> : null}
 
       <Pressable onPress={() => router.push('/subscribe' as never)} style={({ pressed }) => [styles.planLink, pressed && styles.pressed]}>
         <View style={styles.planLinkIcon}><SymbolView name={{ios:'wallet.bifold.fill',android:'workspace_premium',web:'workspace_premium'}} size={22} tintColor={colors.greenDark} type="monochrome" /></View>
-        <View style={styles.flex}><Text style={styles.planLinkLabel}>GÓI HỌC TẬP</Text><Text style={styles.planLinkTitle}>{entitlement ? 'Xem quyền lợi và gia hạn gói' : 'Xem các gói đang mở bán'}</Text></View>
+        <View style={styles.flex}><Text style={styles.planLinkLabel}>GÓI HỌC TẬP</Text><Text style={styles.planLinkTitle}>{entitlement ? 'Xem hạn mức và mua thêm lượt hồ sơ' : 'Xem các gói đang mở bán'}</Text></View>
         <SymbolView name={{ios:'chevron.right',android:'chevron_right',web:'chevron_right'}} size={20} tintColor={colors.greenDark} type="monochrome" />
       </Pressable>
 

@@ -7,26 +7,25 @@ import { useWorkspaceData } from "@/features/account/use-workspace-data";
 import { useAuth } from "@/features/auth/auth-context";
 import { colors, radius, type } from "@/theme/tokens";
 
-const commonRows = [
-  ["🔒", "Đổi mật khẩu", "Cập nhật mật khẩu đăng nhập"],
-  ["📊", "Tổng kết và báo cáo", "Tiến độ, Quiz và hoạt động gần đây"],
-] as const;
-
 export default function ProfileScreen() {
   const { session, setRole, signOut } = useAuth();
-  const { entitlement, group } = useWorkspaceData();
+  const { group, quota } = useWorkspaceData();
   const teacher = session?.role === "TEACHER";
   const contextRow = teacher
     ? (["🏫", "Lớp đang quản lý", group?.name ?? "Chưa có lớp"] as const)
     : (["👨‍👩‍👧", "Gia đình", group?.name ?? "Chưa có nhóm"] as const);
-  const rows = [contextRow, ...commonRows];
+  const rows = [
+    contextRow,
+    ["🔒", "Đổi mật khẩu", "Cập nhật mật khẩu đăng nhập"],
+    ["📊", "Báo cáo học tập", teacher ? "Tiến độ và kết quả của học sinh" : "Tiến độ và kết quả học tập của con"],
+  ] as const;
 
   function openMenuItem(title: string) {
     if (title === "Đổi mật khẩu") {
       router.push("/change-password" as never);
     } else if (title === "Lớp đang quản lý" || title === "Gia đình") {
       router.push("/(tabs)/journey" as never);
-    } else if (title === "Tổng kết và báo cáo") {
+    } else if (title === "Báo cáo học tập") {
       router.push("/(tabs)/rewards" as never);
     }
   }
@@ -82,8 +81,8 @@ export default function ProfileScreen() {
       <Card style={styles.context}>
         <View style={styles.planCopy}>
           <Text style={styles.contextLabel}>CÁC GÓI DỊCH VỤ</Text>
-          <Text style={styles.contextName}>Xem hạn mức, mua thêm hoặc gia hạn</Text>
-          {entitlement ? <Text style={styles.planMeta}>Gói hiện tại dùng đến {entitlement.expiresOn}</Text> : null}
+          <Text style={styles.contextName}>Xem hạn mức hoặc mua thêm lượt hồ sơ</Text>
+          {session?.account.plans.includes(session.role) ? <Text style={styles.planMeta}>Quyền sử dụng vĩnh viễn · còn {quota?.free ?? 0} lượt hồ sơ</Text> : null}
         </View>
         <Pressable onPress={() => router.push('/subscribe' as never)} style={styles.planButton}><Text style={styles.planButtonText}>Xem các gói</Text></Pressable>
       </Card>
