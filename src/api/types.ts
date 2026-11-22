@@ -86,16 +86,16 @@ export type LearnerIndicators = {
 export type ReportGenerationStatus = 'WAITING_POST_TEST' | 'GENERATING' | 'READY' | 'FALLBACK';
 export type ReportSummaryText = { status: ReportGenerationStatus; text?: string | null };
 export type ReportRatio = { correct?: number; total?: number };
-export type ReportChoice = { id?: string; label?: string; text?: string; concept?: string; question?: string; deliberate?: boolean };
-export type ReportWrongItem = ReportChoice & { itemId?: string; gameItemId?: string; itemLabel?: string };
+export type ReportChoice = { sceneId?: string | null; optionId?: string | null; label?: string | null; deliberate?: boolean | null };
+export type ReportWrongItem = { gameId?: string | null; itemId?: string | null; concept?: string | null; chosen?: string | null; label?: string | null; chosenLabel?: string | null; expected?: string | null; expectedLabel?: string | null; explanation?: string | null };
 export type ChapterReport = {
   chapter?: number; chapterNumber?: number; title?: string; reportStatus?: string;
   summary?: ReportSummaryText | null; choices?: ReportChoice[]; deliberate?: ReportChoice[];
   miniGames?: ReportRatio & { wrong?: ReportWrongItem[] };
   postTest?: ReportRatio & { status?: string };
 };
-export type ConceptReport = { concept?: string; band?: 'NO_DATA' | 'PRACTICE' | 'FAMILIAR' | 'GOOD' | string; correct?: number; total?: number; game?: ReportRatio; postTest?: ReportRatio };
-export type FinalReport = { status?: string; summary?: ReportSummaryText | null };
+export type ConceptReport = { concept?: string; name?: string; objective?: string; band?: 'NO_DATA' | 'PRACTICE' | 'FAMILIAR' | 'GOOD' | string; correct?: number; total?: number; game?: ReportRatio; postTest?: ReportRatio };
+export type FinalReport = { status?: 'NONE' | 'PARTIAL' | 'COMPLETE'; summary?: ReportSummaryText | null };
 
 export type SlotReport = {
   learner: {
