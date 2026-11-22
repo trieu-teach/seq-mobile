@@ -37,7 +37,7 @@ export type QuizWriteInput = {
   questionIds: string[];
   newQuestions?: QuestionInput[];
   dueAt: string;
-  mode: QuizMode;
+  mode: QuizMode | null;
   drawCount?: number | null;
   durationMinutes?: number | null;
 };
