@@ -1,14 +1,45 @@
+import { useEffect } from "react";
+import * as Notifications from "expo-notifications";
 import { SplashScreen, Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import { Fraunces_700Bold } from "@expo-google-fonts/fraunces";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "@/features/auth/auth-context";
+import { getDevicePushToken } from "@/features/notifications/push-notifications";
 import { colors } from "@/theme/tokens";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
+/**
+ * Lấy token FCM và in ra log để bàn giao cho BE.
+ *
+ * TODO: khi BE có `POST /api/device-tokens`, đổi `console.log` thành gọi API đó
+ * (gửi lại mỗi lần app mở và mỗi lần token đổi).
+ */
+function usePushToken() {
+  useEffect(() => {
+    let cancelled = false;
+
+    getDevicePushToken()
+      .then((token) => {
+        if (!cancelled) console.log("[push] FCM token:", token);
+      })
+      .catch((error) => console.warn("[push] không lấy được token:", error));
+
+    const subscription = Notifications.addPushTokenListener(({ data }) => {
+      console.log("[push] FCM token mới:", String(data));
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
+  }, []);
+}
+
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({ Fraunces_700Bold });
+  usePushToken();
   if (!fontsLoaded && !fontError) return null;
   return (
     <AuthProvider>
