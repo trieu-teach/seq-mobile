@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "661995037740",
+    "project_id": "finteen-mobile",
+    "storage_bucket": "finteen-mobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:661995037740:android:97f65e208e08bebe7b5d89",
+        "android_client_info": {
+          "package_name": "com.finteen.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLrF-o7TbK9xKerzAB9tSiek3mdRXTXzM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
