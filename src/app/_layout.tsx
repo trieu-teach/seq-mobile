@@ -9,6 +9,7 @@ import {
   registerDevicePushToken,
   syncDevicePushToken,
 } from "@/features/notifications/push-notifications";
+import { useNotificationNavigation } from "@/features/notifications/notification-navigation";
 import { colors } from "@/theme/tokens";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
@@ -51,6 +52,8 @@ export default function RootLayout() {
 function RootNavigator() {
   const { isLoading, session } = useAuth();
   usePushRegistration(session?.accessToken ?? null);
+  // Bấm tin lúc app đang chạy hoặc lúc app bị kill: đợi có phiên rồi mới điều hướng.
+  useNotificationNavigation(!isLoading && Boolean(session));
   if (isLoading) return null;
   SplashScreen.hide();
   return (
