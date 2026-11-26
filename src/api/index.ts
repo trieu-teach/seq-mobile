@@ -1,5 +1,6 @@
 export { ApiError } from './client';
 export { authApi } from './auth';
+export { deviceTokenApi } from './device-tokens';
 export { entitlementsApi } from './entitlements';
 export { groupsApi } from './groups';
 export { paymentsApi, plansApi } from './payments';

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect, useLocalSearchParams, router } from 'expo-router';
 import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { groupsApi, quizzesApi, type Group, type QuizDetail, type QuizResults, type QuizSlotResult, type QuizSummary } from '@/api';
@@ -16,7 +16,17 @@ function kindLabel(quiz: QuizSummary) { return quiz.kind === 'POST_TEST' ? `Hậ
 export default function QuizScreen() { const { session }=useAuth(); return session?.role==='TEACHER'?<TeacherQuiz/>:<Screen title="Kết quả học tập" subtitle="Theo dõi kết quả của con"><Card><Text style={styles.empty}>Kết quả bài kiểm tra của con được tổng hợp trong báo cáo của từng hồ sơ.</Text></Card></Screen>; }
 
 function TeacherQuiz() {
-  const params=useLocalSearchParams<{saved?:string}>(); const [groups,setGroups]=useState<Group[]>([]); const [groupId,setGroupId]=useState(''); const groupIdRef=useRef(''); const [quizzes,setQuizzes]=useState<QuizSummary[]>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState(''); const [message,setMessage]=useState(params.saved==='created'?'Đã tạo đề nháp.':params.saved==='updated'?'Đã cập nhật đề nháp.':''); const [confirm,setConfirm]=useState<{quiz:QuizSummary;type:'publish'|'delete'}|null>(null); const [results,setResults]=useState<QuizResults|null>(null); const [detail,setDetail]=useState<QuizDetail|null>(null); const [busy,setBusy]=useState(false);
+  const params=useLocalSearchParams<{saved?:string;quizId?:string}>(); const [groups,setGroups]=useState<Group[]>([]); const [groupId,setGroupId]=useState(''); const groupIdRef=useRef(''); const [quizzes,setQuizzes]=useState<QuizSummary[]>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState(''); const [message,setMessage]=useState(params.saved==='created'?'Đã tạo đề nháp.':params.saved==='updated'?'Đã cập nhật đề nháp.':''); const [confirm,setConfirm]=useState<{quiz:QuizSummary;type:'publish'|'delete'}|null>(null); const [results,setResults]=useState<QuizResults|null>(null); const [detail,setDetail]=useState<QuizDetail|null>(null); const [busy,setBusy]=useState(false);
+  // Bấm push "bài kiểm tra đã nộp": mở thẳng kết quả của đề đó.
+  const pushQuizId = params.quizId;
+  useEffect(() => {
+    if (!pushQuizId) return;
+    let alive = true;
+    quizzesApi.results(pushQuizId)
+      .then((value) => { if (alive) setResults(value); })
+      .catch((reason) => { if (alive) setError(messageOf(reason)); });
+    return () => { alive = false; };
+  }, [pushQuizId]);
   const loadQuizzes=useCallback(async(id:string)=>{if(!id){setQuizzes([]);setLoading(false);return;}setLoading(true);setError('');try{setQuizzes(await quizzesApi.list(id)??[]);}catch(reason){setError(messageOf(reason));}finally{setLoading(false);}},[]);
   const loadWorkspace=useCallback(async()=>{setLoading(true);setError('');try{const rows=(await groupsApi.list()??[]).filter(g=>g.context==='CLASS');setGroups(rows);const currentId=groupIdRef.current;const selected=rows.some(row=>row.id===currentId)?currentId:(rows.find(g=>!g.closedAt)?.id||rows[0]?.id||'');groupIdRef.current=selected;setGroupId(selected);await loadQuizzes(selected);}catch(reason){setError(messageOf(reason));setLoading(false);}},[loadQuizzes]);
   useFocusEffect(useCallback(()=>{void loadWorkspace();},[loadWorkspace]));

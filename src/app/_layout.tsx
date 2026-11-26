@@ -1,11 +1,42 @@
+import { useEffect } from "react";
+import * as Notifications from "expo-notifications";
 import { SplashScreen, Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import { Fraunces_700Bold } from "@expo-google-fonts/fraunces";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "@/features/auth/auth-context";
+import {
+  registerDevicePushToken,
+  syncDevicePushToken,
+} from "@/features/notifications/push-notifications";
+import { useNotificationNavigation } from "@/features/notifications/notification-navigation";
 import { colors } from "@/theme/tokens";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+/**
+ * Đăng ký token FCM với BE sau khi đã có phiên đăng nhập (API cần Bearer token).
+ *
+ * Chạy lại mỗi lần đăng nhập và mỗi lần FCM cấp token mới. Đăng xuất thì
+ * auth-context gọi `unregisterDevicePushToken` trước khi xoá phiên.
+ */
+function usePushRegistration(accessToken: string | null) {
+  useEffect(() => {
+    if (!accessToken) return;
+
+    registerDevicePushToken().catch((error) =>
+      console.warn("[push] không đăng ký được token:", error),
+    );
+
+    const subscription = Notifications.addPushTokenListener(({ data }) => {
+      syncDevicePushToken(String(data)).catch((error) =>
+        console.warn("[push] không cập nhật được token mới:", error),
+      );
+    });
+
+    return () => subscription.remove();
+  }, [accessToken]);
+}
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({ Fraunces_700Bold });
@@ -20,6 +51,9 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { isLoading, session } = useAuth();
+  usePushRegistration(session?.accessToken ?? null);
+  // Bấm tin lúc app đang chạy hoặc lúc app bị kill: đợi có phiên rồi mới điều hướng.
+  useNotificationNavigation(!isLoading && Boolean(session));
   if (isLoading) return null;
   SplashScreen.hide();
   return (

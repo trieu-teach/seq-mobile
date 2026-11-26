@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SymbolView } from 'expo-symbols';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { groupsApi, slotsApi, type Slot } from '@/api';
 import { ConfirmDialog, NoticeBanner } from '@/components/feedback';
@@ -21,7 +21,9 @@ const parentBanner = require('../../../assets/images/finteen/journey-parent-bg-v
 
 export default function ManagementScreen() {
   const { session } = useAuth();
-  const [selectedGroupId,setSelectedGroupId]=useState('');
+  const { groupId: pushGroupId } = useLocalSearchParams<{ groupId?: string }>();
+  // Bấm push "có em nộp bài" / "báo cáo cả lớp" thì mở đúng lớp đó (param có sẵn lúc mount).
+  const [selectedGroupId,setSelectedGroupId]=useState(() => pushGroupId ?? '');
   const { capacity, error: loadError, group, loading, openGroups, quota, reload, slots } = useWorkspaceData(selectedGroupId);
   const teacher = session?.role === 'TEACHER';
   const active = slots.filter((slot) => slot.status === 'ACTIVE');
