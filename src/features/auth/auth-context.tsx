@@ -3,6 +3,7 @@ import { createContext, type PropsWithChildren, useContext, useEffect, useMemo, 
 import { Platform } from 'react-native';
 import { ApiError, authApi, type Account, type AccountPlan, type TokenResult } from '@/api';
 import { setApiAccessToken } from '@/api/client';
+import { unregisterDevicePushToken } from '@/features/notifications/push-notifications';
 
 const SESSION_KEY = 'finteen.account.session.v1';
 const MOBILE_ROLE_ERROR_MESSAGE =
@@ -138,7 +139,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
     },
     async signIn(email, password) { try { const next = await establishSession(await authApi.login(email, password)); return { ok: true, hasPlan: next.account.plans.length > 0 }; } catch (error) { return { ok: false, message: messageOf(error) }; } },
     async changePassword(oldPassword, newPassword) { try { await establishSession(await authApi.changePassword(oldPassword, newPassword)); return { ok: true }; } catch (error) { return { ok: false, message: messageOf(error) }; } },
-    async signOut() { setApiAccessToken(null); setSession(null); await storeSession(null); },
+    async signOut() { await unregisterDevicePushToken(); setApiAccessToken(null); setSession(null); await storeSession(null); },
   }), [isLoading, session]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

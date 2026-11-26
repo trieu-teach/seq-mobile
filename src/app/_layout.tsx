@@ -5,41 +5,40 @@ import { useFonts } from "expo-font";
 import { Fraunces_700Bold } from "@expo-google-fonts/fraunces";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "@/features/auth/auth-context";
-import { getDevicePushToken } from "@/features/notifications/push-notifications";
+import {
+  registerDevicePushToken,
+  syncDevicePushToken,
+} from "@/features/notifications/push-notifications";
 import { colors } from "@/theme/tokens";
 
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 /**
- * Lấy token FCM và in ra log để bàn giao cho BE.
+ * Đăng ký token FCM với BE sau khi đã có phiên đăng nhập (API cần Bearer token).
  *
- * TODO: khi BE có `POST /api/device-tokens`, đổi `console.log` thành gọi API đó
- * (gửi lại mỗi lần app mở và mỗi lần token đổi).
+ * Chạy lại mỗi lần đăng nhập và mỗi lần FCM cấp token mới. Đăng xuất thì
+ * auth-context gọi `unregisterDevicePushToken` trước khi xoá phiên.
  */
-function usePushToken() {
+function usePushRegistration(accessToken: string | null) {
   useEffect(() => {
-    let cancelled = false;
+    if (!accessToken) return;
 
-    getDevicePushToken()
-      .then((token) => {
-        if (!cancelled) console.log("[push] FCM token:", token);
-      })
-      .catch((error) => console.warn("[push] không lấy được token:", error));
+    registerDevicePushToken().catch((error) =>
+      console.warn("[push] không đăng ký được token:", error),
+    );
 
     const subscription = Notifications.addPushTokenListener(({ data }) => {
-      console.log("[push] FCM token mới:", String(data));
+      syncDevicePushToken(String(data)).catch((error) =>
+        console.warn("[push] không cập nhật được token mới:", error),
+      );
     });
 
-    return () => {
-      cancelled = true;
-      subscription.remove();
-    };
-  }, []);
+    return () => subscription.remove();
+  }, [accessToken]);
 }
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({ Fraunces_700Bold });
-  usePushToken();
   if (!fontsLoaded && !fontError) return null;
   return (
     <AuthProvider>
@@ -51,6 +50,7 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { isLoading, session } = useAuth();
+  usePushRegistration(session?.accessToken ?? null);
   if (isLoading) return null;
   SplashScreen.hide();
   return (
