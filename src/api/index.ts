@@ -3,6 +3,7 @@ export { authApi } from './auth';
 export { deviceTokenApi } from './device-tokens';
 export { entitlementsApi } from './entitlements';
 export { groupsApi } from './groups';
+export { notificationsApi } from './notifications';
 export { paymentsApi, plansApi } from './payments';
 export { reportsApi } from './reports';
 export { quizzesApi } from './quizzes';

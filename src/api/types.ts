@@ -14,6 +14,20 @@ export type Payment = { orderCode: number; kind?: AccountPlan; purpose?: Payment
 export type PaymentStatus = { orderCode: number; status: 'PENDING' | 'PAID' | 'FAILED'; amount: number; paidAt?: string | null };
 export type PaymentPage = Payment[] | { content?: Payment[] };
 
+export type NotificationType = 'CHAPTER_COMPLETED' | 'QUIZ_SUBMITTED' | 'REPORT_READY';
+export type NotificationActionType = 'OPEN_LEARNER_REPORT' | 'OPEN_LEARNER_LIST' | 'OPEN_QUIZ_RESULTS' | 'OPEN_GROUP_REPORT';
+export type AppNotification = {
+  id: string; type: NotificationType; title: string; message: string;
+  slotId: string | null; slotDisplayName: string | null; groupId: string | null;
+  chapter: number | null; quizId: string | null; read: boolean; readAt: string | null;
+  createdAt: string; updatedAt: string;
+  action: { type: NotificationActionType; resourceId: string } | null;
+};
+export type NotificationPage = {
+  items: AppNotification[]; totalElements: number; totalPages: number;
+  page: number; size: number; unreadCount: number;
+};
+
 export type QuizKind = 'CLASS_TEST' | 'POST_TEST';
 export type Question = {
   id: string;

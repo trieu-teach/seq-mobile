@@ -7,6 +7,7 @@ import { NoticeBanner } from "@/components/feedback";
 import { Screen } from "@/components/screen";
 import { useWorkspaceData } from "@/features/account/use-workspace-data";
 import { useAuth } from "@/features/auth/auth-context";
+import { NotificationBell } from "@/features/notifications/notification-bell";
 import { colors, shadow, type } from "@/theme/tokens";
 
 const teacherArt = require("../../../assets/images/finteen/dashboard-teacher-bg-v2.png");
@@ -23,7 +24,7 @@ export default function DashboardScreen() {
   const firstName = session?.displayName?.trim().split(/\s+/).at(-1) ?? "bạn";
 
   return (
-    <Screen action={<Pressable accessibilityLabel="Mở tài khoản" onPress={() => router.push("/(tabs)/profile")} style={styles.avatar}><Text style={styles.avatarText}>{teacher ? "GV" : "PH"}</Text></Pressable>}>
+    <Screen action={<><NotificationBell /><Pressable accessibilityLabel="Mở tài khoản" onPress={() => router.push("/(tabs)/profile")} style={styles.avatar}><Text style={styles.avatarText}>{teacher ? "GV" : "PH"}</Text></Pressable></>}>
       <View style={styles.greetingBlock}>
         <Text style={styles.kicker}>{teacher ? "KHÔNG GIAN GIÁO VIÊN" : "KHÔNG GIAN PHỤ HUYNH"}</Text>
         <Text style={styles.greeting}>Chào {firstName}</Text>

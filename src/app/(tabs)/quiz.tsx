@@ -5,7 +5,6 @@ import { groupsApi, quizzesApi, type Group, type QuizDetail, type QuizResults, t
 import { ConfirmDialog, Toast } from '@/components/feedback';
 import { Screen } from '@/components/screen';
 import { Card, Pill, SectionTitle } from '@/components/ui';
-import { useAuth } from '@/features/auth/auth-context';
 import { colors, radius, shadow, type } from '@/theme/tokens';
 
 const quizErrors: Record<number, string> = { 3004:'Bạn không có quyền thao tác với đề này.',3005:'Tài khoản chưa có gói Giáo viên.',8001:'Không tìm thấy đề.',8002:'Đề đã phát hành hoặc là hậu trắc nên không thể thay đổi.',8008:'Chỉ lớp đang mở mới sử dụng được bài kiểm tra.' };
@@ -13,7 +12,25 @@ function messageOf(reason: unknown) { if (reason && typeof reason === 'object' &
 function dateLabel(value: string | null) { return value ? new Date(value).toLocaleString('vi-VN') : 'Không có hạn'; }
 function kindLabel(quiz: QuizSummary) { return quiz.kind === 'POST_TEST' ? `Hậu trắc chương ${quiz.chapter}` : quiz.mode === 'TEST' ? 'Kiểm tra' : quiz.mode === 'PRACTICE' ? 'Luyện tập' : 'Đề cũ'; }
 
-export default function QuizScreen() { const { session }=useAuth(); return session?.role==='TEACHER'?<TeacherQuiz/>:<Screen title="Kết quả học tập" subtitle="Theo dõi kết quả của con"><Card><Text style={styles.empty}>Kết quả bài kiểm tra của con được tổng hợp trong báo cáo của từng hồ sơ.</Text></Card></Screen>; }
+export default function QuizScreen() { return <TeacherQuiz/>; }
+
+export function ParentPostTests() {
+  const [groups,setGroups]=useState<Group[]>([]); const [groupId,setGroupId]=useState(''); const [quizzes,setQuizzes]=useState<QuizSummary[]>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState(''); const [results,setResults]=useState<QuizResults|null>(null); const [detail,setDetail]=useState<QuizDetail|null>(null); const [busy,setBusy]=useState(false);
+  const load=useCallback(async()=>{setLoading(true);setError('');try{const rows=(await groupsApi.list()??[]).filter(group=>group.context==='FAMILY');setGroups(rows);const selected=rows.some(group=>group.id===groupId)?groupId:(rows.find(group=>!group.closedAt)?.id||rows[0]?.id||'');setGroupId(selected);const items=selected?await quizzesApi.list(selected):[];setQuizzes((items??[]).filter(quiz=>quiz.kind==='POST_TEST'));}catch(reason){setError(messageOf(reason));}finally{setLoading(false);}},[groupId]);
+  useFocusEffect(useCallback(()=>{void load();},[load]));
+  async function selectGroup(id:string){setGroupId(id);setLoading(true);setError('');try{const items=await quizzesApi.list(id);setQuizzes((items??[]).filter(quiz=>quiz.kind==='POST_TEST'));}catch(reason){setError(messageOf(reason));}finally{setLoading(false);}}
+  async function showResults(quiz:QuizSummary){setBusy(true);setError('');try{setResults(await quizzesApi.results(quiz.id));}catch(reason){setError(messageOf(reason));}finally{setBusy(false);}}
+  async function showDetail(quiz:QuizSummary){setBusy(true);setError('');try{setDetail(await quizzesApi.get(quiz.id));}catch(reason){setError(messageOf(reason));}finally{setBusy(false);}}
+  const submitted=quizzes.reduce((sum,quiz)=>sum+quiz.submittedCount,0); const current=groups.find(group=>group.id===groupId);
+  return <Screen scroll={false} title="Hậu trắc của con" subtitle="Theo dõi bài hậu trắc sau từng chương" action={<Pressable onPress={()=>void load()} style={styles.refresh}><Text style={styles.refreshText}>↻</Text></Pressable>}>
+    <FlatList style={listStyles.list} data={loading?[]:quizzes} keyExtractor={quiz=>quiz.id} renderItem={({item})=><ParentPostTestCard quiz={item} onDetail={()=>void showDetail(item)} onResults={()=>void showResults(item)}/>} ListHeaderComponent={<View style={listStyles.header}>{error?<Toast kind="error" message={error} onClose={()=>setError('')}/>:null}{groups.length>1?<ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupTabs}>{groups.map(group=><Pressable key={group.id} onPress={()=>void selectGroup(group.id)} style={[styles.groupTab,groupId===group.id&&styles.groupTabActive]}><Text style={[styles.groupText,groupId===group.id&&styles.groupTextActive]}>{group.name}</Text></Pressable>)}</ScrollView>:null}<View style={styles.hero}><View><Text style={styles.heroEyebrow}>GIA ĐÌNH ĐANG CHỌN</Text><Text style={styles.heroTitle}>{current?.name||'Chưa có nhóm gia đình'}</Text><Text style={styles.heroMeta}>{quizzes.length} bài hậu trắc · {submitted} lượt đã nộp</Text></View></View><SectionTitle>Kết quả hậu trắc</SectionTitle></View>} ListEmptyComponent={loading?<ActivityIndicator size="large" color={colors.greenDark}/>:<Card><Text style={styles.empty}>Chưa có bài hậu trắc nào. Bài hậu trắc sẽ xuất hiện sau khi con hoàn thành nội dung chương trên website.</Text></Card>} contentContainerStyle={listStyles.content} showsVerticalScrollIndicator={false}/>
+    {busy?<View style={parentStyles.busy}><ActivityIndicator color={colors.greenDark}/></View>:null}<DetailModal detail={detail} onClose={()=>setDetail(null)}/><ResultsModal data={results} onClose={()=>setResults(null)}/>
+  </Screen>;
+}
+
+function ParentPostTestCard({quiz,onDetail,onResults}:{quiz:QuizSummary;onDetail:()=>void;onResults:()=>void}){return <Card style={styles.quiz}><View style={styles.quizTop}><View style={styles.quizIcon}><Text style={styles.quizIconText}>✓</Text></View><View style={styles.quizCopy}><Pill color={colors.purpleSoft} textColor={colors.purple}>{kindLabel(quiz)}</Pill><Text style={styles.quizTitle}>{quiz.title}</Text><Text style={styles.quizMeta}>{quiz.questionCount} câu · {quiz.submittedCount} lượt đã nộp</Text></View></View><View style={styles.actions}><Action label="Xem đề" icon="⌕" onPress={onDetail}/><Action label={`Kết quả · ${quiz.submittedCount}`} icon="▤" primary onPress={onResults}/></View></Card>;}
+
+const parentStyles=StyleSheet.create({busy:{position:'absolute',top:12,right:12,width:38,height:38,borderRadius:19,backgroundColor:colors.white,alignItems:'center',justifyContent:'center',...shadow.card}});
 
 function TeacherQuiz() {
   const params=useLocalSearchParams<{saved?:string;quizId?:string}>(); const [groups,setGroups]=useState<Group[]>([]); const [groupId,setGroupId]=useState(''); const groupIdRef=useRef(''); const [quizzes,setQuizzes]=useState<QuizSummary[]>([]); const [loading,setLoading]=useState(true); const [error,setError]=useState(''); const [message,setMessage]=useState(params.saved==='created'?'Đã tạo đề nháp.':params.saved==='updated'?'Đã cập nhật đề nháp.':''); const [confirm,setConfirm]=useState<{quiz:QuizSummary;type:'publish'|'delete'}|null>(null); const [results,setResults]=useState<QuizResults|null>(null); const [detail,setDetail]=useState<QuizDetail|null>(null); const [busy,setBusy]=useState(false);

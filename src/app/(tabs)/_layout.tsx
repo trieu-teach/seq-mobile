@@ -8,6 +8,7 @@ const icons = {
   index: { ios: "house.fill", android: "home", web: "home" },
   journey: { ios: "person.2.fill", android: "groups", web: "groups" },
   quiz: { ios: "questionmark.circle.fill", android: "quiz", web: "quiz" },
+  "post-tests": { ios: "checkmark.seal.fill", android: "fact_check", web: "fact_check" },
   rewards: { ios: "sparkles", android: "workspace_premium", web: "workspace_premium" },
   profile: { ios: "person.crop.circle.fill", android: "account_circle", web: "account_circle" },
 } as const;
@@ -42,6 +43,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: "Tổng quan" }} />
       <Tabs.Screen name="journey" options={{ title: teacher ? "Lớp học" : "Gia đình" }} />
       <Tabs.Screen name="quiz" options={{ title: "Bài kiểm tra", href: teacher ? undefined : null }} />
+      <Tabs.Screen name="post-tests" options={{ title: "Hậu trắc", href: teacher ? null : undefined }} />
       <Tabs.Screen name="rewards" options={{ title: "Báo cáo" }} />
       <Tabs.Screen name="profile" options={{ title: "Tài khoản" }} />
     </Tabs>
